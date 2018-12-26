@@ -1,11 +1,11 @@
-package agent_tests
+package tests
 
 import (
 	"io/ioutil"
 	"os"
 	"testing"
 
-	"github.com/paramite/collectd-sensubility/agent"
+	"github.com/paramite/collectd-sensubility/config"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -26,13 +26,13 @@ OptionsValidator=foo
 
 type validatorTest struct {
 	parameter string
-	validator agent.Validator
+	validator config.Validator
 	defValue  string
 }
 
 func TestConfigValues(t *testing.T) {
 	// create temporary config file
-	file, err := ioutil.TempFile(".", "agent_config_test")
+	file, err := ioutil.TempFile(".", "config_test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,8 +44,8 @@ func TestConfigValues(t *testing.T) {
 		t.Fatal(err)
 	}
 	// test parsing
-	metadata := agent.GetAgentConfigMetadata()
-	conf, err := agent.NewConfig(metadata)
+	metadata := config.GetAgentConfigMetadata()
+	conf, err := config.NewConfig(metadata)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +69,7 @@ func TestConfigValues(t *testing.T) {
 
 func TestValidators(t *testing.T) {
 	// create temporary config file
-	file, err := ioutil.TempFile(".", "agent_config_test")
+	file, err := ioutil.TempFile(".", "config_test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,30 +82,30 @@ func TestValidators(t *testing.T) {
 	}
 	// test failing parsing (each validator separately)
 	tests := []validatorTest{
-		validatorTest{"IntValidator", agent.IntValidatorFactory(), "3"},
-		validatorTest{"MultiIntValidator", agent.MultiIntValidatorFactory(","), "1,2"},
-		validatorTest{"BoolValidator", agent.BoolValidatorFactory(), "true"},
-		validatorTest{"OptionsValidator", agent.OptionsValidatorFactory([]string{"bar", "baz"}), "bar"},
+		validatorTest{"IntValidator", config.IntValidatorFactory(), "3"},
+		validatorTest{"MultiIntValidator", config.MultiIntValidatorFactory(","), "1,2"},
+		validatorTest{"BoolValidator", config.BoolValidatorFactory(), "true"},
+		validatorTest{"OptionsValidator", config.OptionsValidatorFactory([]string{"bar", "baz"}), "bar"},
 	}
 	for _, test := range tests {
-		metadata := map[string][]agent.Parameter{
-			"invalid": []agent.Parameter{
-				agent.Parameter{test.parameter, test.defValue, []agent.Validator{test.validator}},
+		metadata := map[string][]config.Parameter{
+			"invalid": []config.Parameter{
+				config.Parameter{test.parameter, test.defValue, []config.Validator{test.validator}},
 			},
 		}
-		conf, err := agent.NewConfig(metadata)
+		conf, err := config.NewConfig(metadata)
 		err = conf.Parse(file.Name())
 		if err == nil {
 			t.Errorf("Failed to report validation error with %s.", test.parameter)
 		}
 	}
 	// test failing constructor (validation of default values)
-	metadata := map[string][]agent.Parameter{
-		"invalid": []agent.Parameter{
-			agent.Parameter{"default_test", "default", []agent.Validator{agent.IntValidatorFactory()}},
+	metadata := map[string][]config.Parameter{
+		"invalid": []config.Parameter{
+			config.Parameter{"default_test", "default", []config.Validator{config.IntValidatorFactory()}},
 		},
 	}
-	_, err = agent.NewConfig(metadata)
+	_, err = config.NewConfig(metadata)
 	if err == nil {
 		t.Errorf("Failed to report validation error in constructor.")
 	}
