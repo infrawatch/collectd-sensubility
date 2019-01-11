@@ -78,11 +78,7 @@ func GetAgentConfigMetadata() map[string][]Parameter {
 			Parameter{"allow_exec", "true", []Validator{BoolValidatorFactory()}},
 		},
 		"sensu": []Parameter{
-			Parameter{"host", "localhost", []Validator{}},
-			Parameter{"port", "5672", []Validator{IntValidatorFactory()}},
-			Parameter{"user", "sensu", []Validator{}},
-			Parameter{"password", "sensu", []Validator{}},
-			Parameter{"vhost", "/sensu", []Validator{}},
+			Parameter{"connection", "ampq://sensu:sensu@localhost:5672//sensu", []Validator{}},
 			Parameter{"subscriptions", "all,default", []Validator{}},
 		},
 		"amqp1": []Parameter{

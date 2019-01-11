@@ -14,7 +14,7 @@ var CONFIG_CONTENT = `
 log_file=/var/tmp/test.log
 allow_exec=false
 
-[sensu]
+[amqp1]
 port=666
 
 [invalid]
@@ -64,7 +64,7 @@ func TestConfigValues(t *testing.T) {
 	// test parsed overrided values
 	assert.Equal(t, "/var/tmp/test.log", conf.Sections["default"].Options["log_file"].GetString(), "Did not parse correctly")
 	assert.Equal(t, false, conf.Sections["default"].Options["allow_exec"].GetBool(), "Did not parse correctly")
-	assert.Equal(t, 666, conf.Sections["sensu"].Options["port"].GetInt(), "Did not parse correctly")
+	assert.Equal(t, 666, conf.Sections["amqp1"].Options["port"].GetInt(), "Did not parse correctly")
 }
 
 func TestValidators(t *testing.T) {
