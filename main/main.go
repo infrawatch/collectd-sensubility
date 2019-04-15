@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/paramite/collectd-sensubility/config"
 	"github.com/paramite/collectd-sensubility/connector"
@@ -32,16 +33,37 @@ func main() {
 		os.Exit(2)
 	}
 	defer sensu.Disconnect()
-	channel := make(chan interface{})
-	go sensu.Process(channel)
+
+	requests := make(chan interface{})
+	results := make(chan interface{})
+	defer close(results)
+
+	sensu.Start(requests, results)
 	for {
-		msg := <-channel
-		switch msg := msg.(type) {
-		case string:
-			fmt.Printf("command: %q\n", msg)
+		req := <-requests
+		switch req := req.(type) {
+		case connector.SensuCheckRequest:
+			res := connector.SensuResult{
+				Client: connector.DEFAULT_HOSTNAME,
+				Check: connector.SensuCheckResult{
+					Command:  req.Command,
+					Name:     req.Name,
+					Issued:   req.Issued,
+					Executed: time.Now().Unix(),
+					Duration: 0.10,
+					Output:   "Wooot?\n",
+					Status:   0,
+				},
+			}
+			results <- res
 		default:
-			fmt.Printf("[%T] %v\n", msg, msg)
+			fmt.Printf("[%T] %v\n", req, req)
 		}
 	}
+
+	//fmt.Sprintf("%s", request.Command)
+	// cmd := exec.Command(request.Command)
+	// stdout, err := cmd.StdoutPipe()
+	// err = cmd.Start()
 	fmt.Printf("End")
 }

@@ -2,6 +2,6 @@ package connector
 
 type Connector interface {
 	Connect() error
-	Disconnect()
-	Process(channel chan interface{})
+	Disconnect() error
+	Start(out chan interface{}, in chan interface{})
 }

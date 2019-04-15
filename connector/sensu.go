@@ -11,12 +11,37 @@ import (
 	"github.com/streadway/amqp"
 )
 
-const DEFAULT_HOSTNAME = "localhost.localdomain"
+const (
+	DEFAULT_HOSTNAME = "khokhot.localhost.localdomain"
+	RESULTS_QUEUE    = "results"
+)
+
+type SensuCheckRequest struct {
+	Command string
+	Name    string
+	Issued  int
+}
+
+type SensuCheckResult struct {
+	Command  string  `json:"command"`
+	Name     string  `json:"name"`
+	Issued   int     `json:"issued"`
+	Executed int64   `json:"executed"`
+	Duration float32 `json:"duration"`
+	Output   string  `json:"output"`
+	Status   int     `json:"status"`
+}
+
+type SensuResult struct {
+	Client string           `json:"client"`
+	Check  SensuCheckResult `json:"check"`
+}
 
 type SensuConnector struct {
 	Address      string
 	Subscription []string
 	connection   *amqp.Connection
+	exchangeName string
 	channel      *amqp.Channel
 	queue        amqp.Queue
 	consumer     <-chan amqp.Delivery
@@ -51,14 +76,15 @@ func (self *SensuConnector) Connect() error {
 	}
 
 	// declare an exchange for this client
+	self.exchangeName = fmt.Sprintf("client:%s", host)
 	err = self.channel.ExchangeDeclare(
-		fmt.Sprintf("client:%s", host), // name
-		"fanout",                       // type
-		false,                          // durable
-		false,                          // auto-deleted
-		false,                          // internal
-		false,                          // no-wait
-		nil,                            // arguments
+		self.exchangeName, // name
+		"fanout",          // type
+		false,             // durable
+		false,             // auto-deleted
+		false,             // internal
+		false,             // no-wait
+		nil,               // arguments
 	)
 	if err != nil {
 		return errors.Trace(err)
@@ -67,7 +93,7 @@ func (self *SensuConnector) Connect() error {
 	// declare a queue for this client
 	timestamp := time.Now().Unix()
 	self.queue, err = self.channel.QueueDeclare(
-		fmt.Sprintf("%s-collectd-%s", host, timestamp), // name
+		fmt.Sprintf("%s-collectd-%d", host, timestamp), // name
 		false, // durable
 		false, // delete unused
 		false, // exclusive
@@ -108,28 +134,56 @@ func (self *SensuConnector) Connect() error {
 	return nil
 }
 
-func (self *SensuConnector) Disconnect() {
+func (self *SensuConnector) Disconnect() error {
 	self.channel.Close()
-	self.connection.Close()
+	return self.connection.Close()
 }
 
-func (self *SensuConnector) Process(channel chan interface{}) {
-	var request struct {
-		Command string
-		Name    string
-		Issued  int
-	}
-	for req := range self.consumer {
-		fmt.Sprintf("%s", req.Body)
-		err := json.Unmarshal(req.Body, &request)
-		if err == nil {
-			channel <- request.Command
-		} else {
-			//TO-DO: log waning
+func (self *SensuConnector) Start(outchan chan interface{}, inchan chan interface{}) {
+	// receiving loop
+	go func() {
+		for req := range self.consumer {
+			var request SensuCheckRequest
+			err := json.Unmarshal(req.Body, &request)
+			if err == nil {
+				outchan <- request
+			} else {
+				//TODO: log warning
+			}
 		}
-		//fmt.Sprintf("%s", request.Command)
-		// cmd := exec.Command(request.Command)
-		// stdout, err := cmd.StdoutPipe()
-		// err = cmd.Start()
-	}
+	}()
+
+	// sending loop
+	go func() {
+		for res := range inchan {
+			switch result := res.(type) {
+			case SensuResult:
+				body, err := json.Marshal(result)
+				fmt.Printf("%s\n", body)
+				if err != nil {
+					//TODO: log warning
+					continue
+				}
+				err = self.channel.Publish(
+					"",
+					RESULTS_QUEUE, // routing to 0 or more queues
+					false,         // mandatory
+					false,         // immediate
+					amqp.Publishing{
+						Headers:         amqp.Table{},
+						ContentType:     "text/json",
+						ContentEncoding: "",
+						Body:            body,
+						DeliveryMode:    amqp.Transient, // 1=non-persistent, 2=persistent
+						Priority:        0,              // 0-9
+					})
+				if err != nil {
+					//TODO: log warning
+					fmt.Printf("fuck it: %s\n", err)
+				}
+			default:
+				//TODO: log warning
+			}
+		}
+	}()
 }
