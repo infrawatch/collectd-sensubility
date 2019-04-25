@@ -3,7 +3,6 @@ package connector
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/juju/errors"
@@ -12,8 +11,8 @@ import (
 )
 
 const (
-	DEFAULT_HOSTNAME = "khokhot.localhost.localdomain"
-	RESULTS_QUEUE    = "results"
+	KEEPALIVE_QUEUE = "keepalives"
+	RESULTS_QUEUE   = "results"
 )
 
 type SensuCheckRequest struct {
@@ -37,20 +36,34 @@ type SensuResult struct {
 	Check  SensuCheckResult `json:"check"`
 }
 
+type SensuKeepalive struct {
+	Name         string   `json:"name"`
+	Address      string   `json:"address"`
+	Subscription []string `json:"subscriptions"`
+	Version      string   `json:"version"`
+	Timestamp    int64    `json:"timestamp"`
+}
+
 type SensuConnector struct {
-	Address      string
-	Subscription []string
-	connection   *amqp.Connection
-	exchangeName string
-	channel      *amqp.Channel
-	queue        amqp.Queue
-	consumer     <-chan amqp.Delivery
+	Address           string
+	Subscription      []string
+	ClientName        string
+	ClientAddress     string
+	KeepaliveInterval int
+	connection        *amqp.Connection
+	exchangeName      string
+	channel           *amqp.Channel
+	queue             amqp.Queue
+	consumer          <-chan amqp.Delivery
 }
 
 func NewSensuConnector(cfg *config.Config) (*SensuConnector, error) {
 	var connector SensuConnector
 	connector.Address = cfg.Sections["sensu"].Options["connection"].GetString()
 	connector.Subscription = cfg.Sections["sensu"].Options["subscriptions"].GetStrings(",")
+	connector.ClientName = cfg.Sections["sensu"].Options["client_name"].GetString()
+	connector.ClientAddress = cfg.Sections["sensu"].Options["client_address"].GetString()
+	connector.KeepaliveInterval = cfg.Sections["sensu"].Options["keepalive_interval"].GetInt()
 	err := connector.Connect()
 	if err != nil {
 		return nil, errors.Trace(err)
@@ -70,13 +83,8 @@ func (self *SensuConnector) Connect() error {
 		return errors.Trace(err)
 	}
 
-	host := os.Getenv("COLLECTD_HOSTNAME")
-	if host == "" {
-		host = DEFAULT_HOSTNAME
-	}
-
 	// declare an exchange for this client
-	self.exchangeName = fmt.Sprintf("client:%s", host)
+	self.exchangeName = fmt.Sprintf("client:%s", self.ClientName)
 	err = self.channel.ExchangeDeclare(
 		self.exchangeName, // name
 		"fanout",          // type
@@ -93,7 +101,7 @@ func (self *SensuConnector) Connect() error {
 	// declare a queue for this client
 	timestamp := time.Now().Unix()
 	self.queue, err = self.channel.QueueDeclare(
-		fmt.Sprintf("%s-collectd-%d", host, timestamp), // name
+		fmt.Sprintf("%s-collectd-%d", self.ClientName, timestamp), // name
 		false, // durable
 		false, // delete unused
 		false, // exclusive
@@ -159,7 +167,6 @@ func (self *SensuConnector) Start(outchan chan interface{}, inchan chan interfac
 			switch result := res.(type) {
 			case SensuResult:
 				body, err := json.Marshal(result)
-				fmt.Printf("%s\n", body)
 				if err != nil {
 					//TODO: log warning
 					continue
@@ -179,11 +186,44 @@ func (self *SensuConnector) Start(outchan chan interface{}, inchan chan interfac
 					})
 				if err != nil {
 					//TODO: log warning
-					fmt.Printf("fuck it: %s\n", err)
 				}
 			default:
 				//TODO: log warning
 			}
+		}
+	}()
+
+	// keepalive loop
+	go func() {
+		for {
+			body, err := json.Marshal(SensuKeepalive{
+				Name:         self.ClientName,
+				Address:      self.ClientAddress,
+				Subscription: self.Subscription,
+				Version:      "collectd",
+				Timestamp:    time.Now().Unix(),
+			})
+			if err != nil {
+				//TODO: log warning
+				continue
+			}
+			err = self.channel.Publish(
+				"",
+				KEEPALIVE_QUEUE, // routing to 0 or more queues
+				false,           // mandatory
+				false,           // immediate
+				amqp.Publishing{
+					Headers:         amqp.Table{},
+					ContentType:     "text/json",
+					ContentEncoding: "",
+					Body:            body,
+					DeliveryMode:    amqp.Transient, // 1=non-persistent, 2=persistent
+					Priority:        0,              // 0-9
+				})
+			if err != nil {
+				//TODO: log warning
+			}
+			time.Sleep(time.Duration(self.KeepaliveInterval) * time.Second)
 		}
 	}()
 }

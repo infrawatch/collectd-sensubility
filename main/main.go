@@ -44,7 +44,7 @@ func main() {
 		switch req := req.(type) {
 		case connector.SensuCheckRequest:
 			res := connector.SensuResult{
-				Client: connector.DEFAULT_HOSTNAME,
+				Client: config.GetHostname(),
 				Check: connector.SensuCheckResult{
 					Command:  req.Command,
 					Name:     req.Name,

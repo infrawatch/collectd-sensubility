@@ -2,10 +2,17 @@ package config
 
 import (
 	"fmt"
+	"net"
+	"os"
 	"strconv"
 	"strings"
 
 	"github.com/go-ini/ini"
+)
+
+const (
+	DEFAULT_HOSTNAME = "localhost.localdomain"
+	DEFAULT_IP       = "127.0.0.1"
 )
 
 /******************************************************************************/
@@ -69,6 +76,25 @@ func MultiIntValidatorFactory(separator string) Validator {
 }
 
 /******************************************************************************/
+func GetHostname() string {
+	if host := os.Getenv("COLLECTD_HOSTNAME"); host != "" {
+		return host
+	}
+	if host, err := os.Hostname(); err == nil {
+		return host
+	}
+	return DEFAULT_HOSTNAME
+}
+
+func GetOutboundIP() string {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		return DEFAULT_IP
+	}
+	defer conn.Close()
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	return localAddr.IP.String()
+}
 
 func GetAgentConfigMetadata() map[string][]Parameter {
 	elements := map[string][]Parameter{
@@ -80,6 +106,9 @@ func GetAgentConfigMetadata() map[string][]Parameter {
 		"sensu": []Parameter{
 			Parameter{"connection", "ampq://sensu:sensu@localhost:5672//sensu", []Validator{}},
 			Parameter{"subscriptions", "all,default", []Validator{}},
+			Parameter{"client_name", GetHostname(), []Validator{}},
+			Parameter{"client_address", GetOutboundIP(), []Validator{}},
+			Parameter{"keepalive_interval", "20", []Validator{IntValidatorFactory()}},
 		},
 		"amqp1": []Parameter{
 			Parameter{"host", "localhost", []Validator{}},
