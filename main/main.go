@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/paramite/collectd-sensubility/config"
-	"github.com/paramite/collectd-sensubility/connector"
+	"github.com/paramite/collectd-sensubility/sensu"
 )
 
 const DEFAULT_CONFIG_PATH = "/etc/collectd-sensubility.conf"
@@ -27,25 +27,25 @@ func main() {
 		panic(err.Error())
 	}
 	fmt.Printf("Test\n")
-	sensu, err := connector.NewSensuConnector(cfg)
+	sensuConnector, err := sensu.NewSensuConnector(cfg)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(2)
 	}
-	defer sensu.Disconnect()
+	defer sensuConnector.Disconnect()
 
 	requests := make(chan interface{})
 	results := make(chan interface{})
 	defer close(results)
 
-	sensu.Start(requests, results)
+	sensuConnector.Start(requests, results)
 	for {
 		req := <-requests
 		switch req := req.(type) {
-		case connector.SensuCheckRequest:
-			res := connector.SensuResult{
+		case sensu.SensuCheckRequest:
+			res := sensu.SensuResult{
 				Client: config.GetHostname(),
-				Check: connector.SensuCheckResult{
+				Check: sensu.SensuCheckResult{
 					Command:  req.Command,
 					Name:     req.Name,
 					Issued:   req.Issued,

@@ -1,4 +1,4 @@
-package connector
+package sensu
 
 import (
 	"encoding/json"
@@ -50,9 +50,12 @@ type SensuConnector struct {
 	ClientName        string
 	ClientAddress     string
 	KeepaliveInterval int
-	connection        *amqp.Connection
+	queueName         string
 	exchangeName      string
-	channel           *amqp.Channel
+	inConnection      *amqp.Connection
+	outConnection     *amqp.Connection
+	inChannel         *amqp.Channel
+	outChannel        *amqp.Channel
 	queue             amqp.Queue
 	consumer          <-chan amqp.Delivery
 }
@@ -64,6 +67,10 @@ func NewSensuConnector(cfg *config.Config) (*SensuConnector, error) {
 	connector.ClientName = cfg.Sections["sensu"].Options["client_name"].GetString()
 	connector.ClientAddress = cfg.Sections["sensu"].Options["client_address"].GetString()
 	connector.KeepaliveInterval = cfg.Sections["sensu"].Options["keepalive_interval"].GetInt()
+
+	connector.exchangeName = fmt.Sprintf("client:%s", connector.ClientName)
+	connector.queueName = fmt.Sprintf("%s-collectd-%d", connector.ClientName, time.Now().Unix())
+
 	err := connector.Connect()
 	if err != nil {
 		return nil, errors.Trace(err)
@@ -73,19 +80,28 @@ func NewSensuConnector(cfg *config.Config) (*SensuConnector, error) {
 
 func (self *SensuConnector) Connect() error {
 	var err error
-	self.connection, err = amqp.Dial(self.Address)
+	self.inConnection, err = amqp.Dial(self.Address)
 	if err != nil {
 		return errors.Trace(err)
 	}
 
-	self.channel, err = self.connection.Channel()
+	self.outConnection, err = amqp.Dial(self.Address)
+	if err != nil {
+		return errors.Trace(err)
+	}
+
+	self.inChannel, err = self.inConnection.Channel()
+	if err != nil {
+		return errors.Trace(err)
+	}
+
+	self.outChannel, err = self.outConnection.Channel()
 	if err != nil {
 		return errors.Trace(err)
 	}
 
 	// declare an exchange for this client
-	self.exchangeName = fmt.Sprintf("client:%s", self.ClientName)
-	err = self.channel.ExchangeDeclare(
+	err = self.inChannel.ExchangeDeclare(
 		self.exchangeName, // name
 		"fanout",          // type
 		false,             // durable
@@ -99,24 +115,23 @@ func (self *SensuConnector) Connect() error {
 	}
 
 	// declare a queue for this client
-	timestamp := time.Now().Unix()
-	self.queue, err = self.channel.QueueDeclare(
-		fmt.Sprintf("%s-collectd-%d", self.ClientName, timestamp), // name
-		false, // durable
-		false, // delete unused
-		false, // exclusive
-		false, // no-wait
-		nil,   // arguments
+	self.queue, err = self.inChannel.QueueDeclare(
+		self.queueName, // name
+		false,          // durable
+		false,          // delete unused
+		false,          // exclusive
+		false,          // no-wait
+		nil,            // arguments
 	)
 	if err != nil {
 		return errors.Trace(err)
 	}
 
 	// register consumer
-	self.consumer, err = self.channel.Consume(
+	self.consumer, err = self.inChannel.Consume(
 		self.queue.Name, // queue
-		"collectd",      // consumer
-		true,            // auto ack
+		self.ClientName, // consumer
+		false,           // auto ack
 		false,           // exclusive
 		false,           // no local
 		false,           // no wait
@@ -128,7 +143,7 @@ func (self *SensuConnector) Connect() error {
 
 	// bind client queue with subscriptions
 	for _, sub := range self.Subscription {
-		err := self.channel.QueueBind(
+		err := self.inChannel.QueueBind(
 			self.queue.Name, // queue name
 			"",              // routing key
 			sub,             // exchange
@@ -139,12 +154,20 @@ func (self *SensuConnector) Connect() error {
 			return errors.Trace(err)
 		}
 	}
+
 	return nil
 }
 
-func (self *SensuConnector) Disconnect() error {
-	self.channel.Close()
-	return self.connection.Close()
+func (self *SensuConnector) ReConnect() error {
+
+	return nil
+}
+
+func (self *SensuConnector) Disconnect() {
+	self.inChannel.Close()
+	self.outChannel.Close()
+	self.inConnection.Close()
+	self.outConnection.Close()
 }
 
 func (self *SensuConnector) Start(outchan chan interface{}, inchan chan interface{}) {
@@ -153,6 +176,7 @@ func (self *SensuConnector) Start(outchan chan interface{}, inchan chan interfac
 		for req := range self.consumer {
 			var request SensuCheckRequest
 			err := json.Unmarshal(req.Body, &request)
+			req.Ack(false)
 			if err == nil {
 				outchan <- request
 			} else {
@@ -171,7 +195,7 @@ func (self *SensuConnector) Start(outchan chan interface{}, inchan chan interfac
 					//TODO: log warning
 					continue
 				}
-				err = self.channel.Publish(
+				err = self.outChannel.Publish(
 					"",
 					RESULTS_QUEUE, // routing to 0 or more queues
 					false,         // mandatory
@@ -207,7 +231,7 @@ func (self *SensuConnector) Start(outchan chan interface{}, inchan chan interfac
 				//TODO: log warning
 				continue
 			}
-			err = self.channel.Publish(
+			err = self.outChannel.Publish(
 				"",
 				KEEPALIVE_QUEUE, // routing to 0 or more queues
 				false,           // mandatory
