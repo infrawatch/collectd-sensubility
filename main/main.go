@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/paramite/collectd-sensubility/config"
 	"github.com/paramite/collectd-sensubility/sensu"
@@ -26,44 +25,46 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
-	fmt.Printf("Test\n")
-	sensuConnector, err := sensu.NewSensuConnector(cfg)
+	fmt.Printf(cfg.Sections["sensu"].Options["checks"].GetString())
+	sensuConnector, err := sensu.NewConnector(cfg)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(2)
 	}
 	defer sensuConnector.Disconnect()
 
+	sensuScheduler, err := sensu.NewScheduler(cfg)
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(2)
+	}
+
+	sensuExecutor, err := sensu.NewExecutor(cfg)
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(2)
+	}
+
 	requests := make(chan interface{})
 	results := make(chan interface{})
 	defer close(results)
 
 	sensuConnector.Start(requests, results)
+	sensuScheduler.Start(requests)
+	// mani loop for executing commands
+
 	for {
 		req := <-requests
 		switch req := req.(type) {
-		case sensu.SensuCheckRequest:
-			res := sensu.SensuResult{
-				Client: config.GetHostname(),
-				Check: sensu.SensuCheckResult{
-					Command:  req.Command,
-					Name:     req.Name,
-					Issued:   req.Issued,
-					Executed: time.Now().Unix(),
-					Duration: 0.10,
-					Output:   "Wooot?\n",
-					Status:   0,
-				},
+		case sensu.CheckRequest:
+			res, err := sensuExecutor.Execute(req)
+			if err != nil {
+				//TODO: log warning
 			}
 			results <- res
 		default:
-			fmt.Printf("[%T] %v\n", req, req)
+			//TODO: log warning
 		}
 	}
-
-	//fmt.Sprintf("%s", request.Command)
-	// cmd := exec.Command(request.Command)
-	// stdout, err := cmd.StdoutPipe()
-	// err = cmd.Start()
 	fmt.Printf("End")
 }

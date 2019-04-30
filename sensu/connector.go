@@ -15,28 +15,13 @@ const (
 	RESULTS_QUEUE   = "results"
 )
 
-type SensuCheckRequest struct {
+type CheckRequest struct {
 	Command string
 	Name    string
-	Issued  int
+	Issued  int64
 }
 
-type SensuCheckResult struct {
-	Command  string  `json:"command"`
-	Name     string  `json:"name"`
-	Issued   int     `json:"issued"`
-	Executed int64   `json:"executed"`
-	Duration float32 `json:"duration"`
-	Output   string  `json:"output"`
-	Status   int     `json:"status"`
-}
-
-type SensuResult struct {
-	Client string           `json:"client"`
-	Check  SensuCheckResult `json:"check"`
-}
-
-type SensuKeepalive struct {
+type Keepalive struct {
 	Name         string   `json:"name"`
 	Address      string   `json:"address"`
 	Subscription []string `json:"subscriptions"`
@@ -44,7 +29,7 @@ type SensuKeepalive struct {
 	Timestamp    int64    `json:"timestamp"`
 }
 
-type SensuConnector struct {
+type Connector struct {
 	Address           string
 	Subscription      []string
 	ClientName        string
@@ -60,8 +45,8 @@ type SensuConnector struct {
 	consumer          <-chan amqp.Delivery
 }
 
-func NewSensuConnector(cfg *config.Config) (*SensuConnector, error) {
-	var connector SensuConnector
+func NewConnector(cfg *config.Config) (*Connector, error) {
+	var connector Connector
 	connector.Address = cfg.Sections["sensu"].Options["connection"].GetString()
 	connector.Subscription = cfg.Sections["sensu"].Options["subscriptions"].GetStrings(",")
 	connector.ClientName = cfg.Sections["sensu"].Options["client_name"].GetString()
@@ -78,7 +63,7 @@ func NewSensuConnector(cfg *config.Config) (*SensuConnector, error) {
 	return &connector, nil
 }
 
-func (self *SensuConnector) Connect() error {
+func (self *Connector) Connect() error {
 	var err error
 	self.inConnection, err = amqp.Dial(self.Address)
 	if err != nil {
@@ -158,23 +143,23 @@ func (self *SensuConnector) Connect() error {
 	return nil
 }
 
-func (self *SensuConnector) ReConnect() error {
+func (self *Connector) ReConnect() error {
 
 	return nil
 }
 
-func (self *SensuConnector) Disconnect() {
+func (self *Connector) Disconnect() {
 	self.inChannel.Close()
 	self.outChannel.Close()
 	self.inConnection.Close()
 	self.outConnection.Close()
 }
 
-func (self *SensuConnector) Start(outchan chan interface{}, inchan chan interface{}) {
+func (self *Connector) Start(outchan chan interface{}, inchan chan interface{}) {
 	// receiving loop
 	go func() {
 		for req := range self.consumer {
-			var request SensuCheckRequest
+			var request CheckRequest
 			err := json.Unmarshal(req.Body, &request)
 			req.Ack(false)
 			if err == nil {
@@ -189,15 +174,15 @@ func (self *SensuConnector) Start(outchan chan interface{}, inchan chan interfac
 	go func() {
 		for res := range inchan {
 			switch result := res.(type) {
-			case SensuResult:
+			case Result:
 				body, err := json.Marshal(result)
 				if err != nil {
 					//TODO: log warning
 					continue
 				}
 				err = self.outChannel.Publish(
-					"",
-					RESULTS_QUEUE, // routing to 0 or more queues
+					"",            // exchange
+					RESULTS_QUEUE, // queue
 					false,         // mandatory
 					false,         // immediate
 					amqp.Publishing{
@@ -220,7 +205,7 @@ func (self *SensuConnector) Start(outchan chan interface{}, inchan chan interfac
 	// keepalive loop
 	go func() {
 		for {
-			body, err := json.Marshal(SensuKeepalive{
+			body, err := json.Marshal(Keepalive{
 				Name:         self.ClientName,
 				Address:      self.ClientAddress,
 				Subscription: self.Subscription,
@@ -232,8 +217,8 @@ func (self *SensuConnector) Start(outchan chan interface{}, inchan chan interfac
 				continue
 			}
 			err = self.outChannel.Publish(
-				"",
-				KEEPALIVE_QUEUE, // routing to 0 or more queues
+				"",              // exchange
+				KEEPALIVE_QUEUE, // queue
 				false,           // mandatory
 				false,           // immediate
 				amqp.Publishing{

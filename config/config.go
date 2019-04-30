@@ -109,6 +109,9 @@ func GetAgentConfigMetadata() map[string][]Parameter {
 			Parameter{"client_name", GetHostname(), []Validator{}},
 			Parameter{"client_address", GetOutboundIP(), []Validator{}},
 			Parameter{"keepalive_interval", "20", []Validator{IntValidatorFactory()}},
+			Parameter{"tmp_base_dir", "/var/tmp/collectd-sensubility-checks", []Validator{}},
+			Parameter{"shell_path", "/usr/bin/sh", []Validator{}},
+			Parameter{"checks", "{}", []Validator{}},
 		},
 		"amqp1": []Parameter{
 			Parameter{"host", "localhost", []Validator{}},
@@ -123,6 +126,10 @@ func GetAgentConfigMetadata() map[string][]Parameter {
 /********** Value methods ***********/
 func (opt Option) GetString() string {
 	return opt.value
+}
+
+func (opt Option) GetBytes() []byte {
+	return []byte(opt.value)
 }
 
 func (opt Option) GetStrings(separator string) []string {
@@ -181,7 +188,7 @@ func NewConfig(metadata map[string][]Parameter) (*Config, error) {
 }
 
 func (conf *Config) Parse(path string) error {
-	data, err := ini.Load(path)
+	data, err := ini.LoadSources(ini.LoadOptions{AllowPythonMultilineValues: true}, path) //ini.Load(path)
 	if err != nil {
 		return err
 	}
