@@ -25,7 +25,6 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
-	fmt.Printf(cfg.Sections["sensu"].Options["checks"].GetString())
 	sensuConnector, err := sensu.NewConnector(cfg)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -47,24 +46,29 @@ func main() {
 
 	requests := make(chan interface{})
 	results := make(chan interface{})
+	wait := make(chan bool)
 	defer close(results)
 
 	sensuConnector.Start(requests, results)
 	sensuScheduler.Start(requests)
-	// mani loop for executing commands
-
-	for {
-		req := <-requests
-		switch req := req.(type) {
-		case sensu.CheckRequest:
-			res, err := sensuExecutor.Execute(req)
-			if err != nil {
-				//TODO: log warning
+	// spawn worker goroutines
+	workers := cfg.Sections["sensu"].Options["worker_count"].GetInt()
+	for i := 0; i < workers; i++ {
+		go func() {
+			for {
+				req := <-requests
+				switch req := req.(type) {
+				case sensu.CheckRequest:
+					res, err := sensuExecutor.Execute(req)
+					if err != nil {
+						//TODO: log warning
+					}
+					results <- res
+				default:
+					//TODO: log warning
+				}
 			}
-			results <- res
-		default:
-			//TODO: log warning
-		}
+		}()
 	}
-	fmt.Printf("End")
+	<-wait
 }

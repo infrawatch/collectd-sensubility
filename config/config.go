@@ -111,6 +111,7 @@ func GetAgentConfigMetadata() map[string][]Parameter {
 			Parameter{"keepalive_interval", "20", []Validator{IntValidatorFactory()}},
 			Parameter{"tmp_base_dir", "/var/tmp/collectd-sensubility-checks", []Validator{}},
 			Parameter{"shell_path", "/usr/bin/sh", []Validator{}},
+			Parameter{"worker_count", "2", []Validator{IntValidatorFactory()}},
 			Parameter{"checks", "{}", []Validator{}},
 		},
 		"amqp1": []Parameter{

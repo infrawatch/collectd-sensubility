@@ -65,6 +65,7 @@ func TestConfigValues(t *testing.T) {
 	assert.Equal(t, "/var/tmp/test.log", conf.Sections["default"].Options["log_file"].GetString(), "Did not parse correctly")
 	assert.Equal(t, false, conf.Sections["default"].Options["allow_exec"].GetBool(), "Did not parse correctly")
 	assert.Equal(t, 666, conf.Sections["amqp1"].Options["port"].GetInt(), "Did not parse correctly")
+	os.Remove(file.Name())
 }
 
 func TestValidators(t *testing.T) {
@@ -109,4 +110,5 @@ func TestValidators(t *testing.T) {
 	if err == nil {
 		t.Errorf("Failed to report validation error in constructor.")
 	}
+	os.Remove(file.Name())
 }
