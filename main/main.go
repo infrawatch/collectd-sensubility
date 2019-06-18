@@ -62,6 +62,7 @@ func main() {
 					res, err := sensuExecutor.Execute(req)
 					if err != nil {
 						//TODO: log warning
+						continue
 					}
 					results <- res
 				default:

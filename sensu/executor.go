@@ -63,11 +63,11 @@ func (self *Executor) Execute(request CheckRequest) (Result, error) {
 	if _, ok := self.scriptCache[request.Command]; !ok {
 		scriptFile, err := ioutil.TempFile(self.TmpBaseDir, "check-")
 		if err != nil {
-			return Result{}, err
+			return Result{}, fmt.Errorf("Failed to create temporary file for script: %s", err)
 		}
 		_, err = scriptFile.Write([]byte(fmt.Sprintf("#!/usr/bin/env sh\n%s\n", request.Command)))
 		if err != nil {
-			return Result{}, err
+			return Result{}, fmt.Errorf("Failed to write script content to temporary file: %s", err)
 		}
 		self.scriptCache[request.Command] = scriptFile.Name()
 		scriptFile.Close()
