@@ -11,6 +11,7 @@ import (
 
 	"github.com/juju/errors"
 	"github.com/paramite/collectd-sensubility/config"
+	"github.com/rs/zerolog"
 )
 
 const (
@@ -38,15 +39,18 @@ type Executor struct {
 	ClientName  string
 	TmpBaseDir  string
 	ShellPath   string
+	log         zerolog.Logger
 	scriptCache map[string]string
 }
 
-func NewExecutor(cfg *config.Config) (*Executor, error) {
+func NewExecutor(cfg *config.Config, logger zerolog.Logger) (*Executor, error) {
 	var executor Executor
 	executor.ClientName = cfg.Sections["sensu"].Options["client_name"].GetString()
 	executor.TmpBaseDir = cfg.Sections["sensu"].Options["tmp_base_dir"].GetString()
 	executor.ShellPath = cfg.Sections["sensu"].Options["shell_path"].GetString()
+
 	executor.scriptCache = make(map[string]string)
+	executor.log = logger
 	if _, err := os.Stat(executor.TmpBaseDir); os.IsNotExist(err) {
 		err := os.MkdirAll(executor.TmpBaseDir, 0700)
 		if err != nil {
@@ -71,6 +75,7 @@ func (self *Executor) Execute(request CheckRequest) (Result, error) {
 		}
 		self.scriptCache[request.Command] = scriptFile.Name()
 		scriptFile.Close()
+		self.log.Debug().Str("command", request.Command).Str("path", scriptFile.Name()).Msg("Created check script.")
 	}
 
 	//cmdParts := strings.Split(request.Command, " ")
@@ -97,6 +102,7 @@ func (self *Executor) Execute(request CheckRequest) (Result, error) {
 	} else if strings.TrimSpace(cmdErr) != "" {
 		status = CHECK_WARN
 	}
+
 	result := Result{
 		Client: self.ClientName,
 		Check: CheckResult{
@@ -110,11 +116,11 @@ func (self *Executor) Execute(request CheckRequest) (Result, error) {
 		},
 	}
 
+	self.log.Debug().Str("command", request.Command).Int("status", status).Msg("Executed check script.")
 	return result, nil
 }
 
-func (self *Executor) Clean() error {
-	//TODO: delete tmp dir
-
-	return nil
+func (self *Executor) Clean() {
+	os.Remove(self.TmpBaseDir)
+	self.log.Debug().Str("dir", self.TmpBaseDir).Msg("Removed temporary directory.")
 }

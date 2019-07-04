@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/go-ini/ini"
+	"github.com/rs/zerolog"
 )
 
 const (
@@ -33,6 +34,7 @@ type Section struct {
 }
 
 type Config struct {
+	log      zerolog.Logger
 	metadata map[string][]Parameter
 	Sections map[string]*Section
 }
@@ -168,9 +170,10 @@ func validate(value string, validators []Validator) error {
 	return nil
 }
 
-func NewConfig(metadata map[string][]Parameter) (*Config, error) {
+func NewConfig(metadata map[string][]Parameter, logger zerolog.Logger) (*Config, error) {
 	var conf Config
 	conf.metadata = metadata
+	conf.log = logger
 	// initialize config with default values
 	conf.Sections = make(map[string]*Section)
 	for sectionName, sectionMetadata := range conf.metadata {
@@ -193,7 +196,6 @@ func (conf *Config) Parse(path string) error {
 	if err != nil {
 		return err
 	}
-	//TODO: log loaded config file
 	for sectionName, sectionMetadata := range conf.metadata {
 		if sectionData, err := data.GetSection(sectionName); err == nil {
 			for _, param := range sectionMetadata {
@@ -202,6 +204,17 @@ func (conf *Config) Parse(path string) error {
 						return fmt.Errorf("Failed to validate parameter %s. %s", param.Name, err.Error())
 					}
 					conf.Sections[sectionName].Options[param.Name].value = paramData.Value()
+					conf.log.Debug().
+						Str("section", sectionName).
+						Str("option", param.Name).
+						Str("value", paramData.Value()).
+						Msg("Using parsed configuration value.")
+				} else {
+					conf.log.Debug().
+						Str("section", sectionName).
+						Str("option", param.Name).
+						Str("value", conf.Sections[sectionName].Options[param.Name].value).
+						Msg("Using default configuration value.")
 				}
 			}
 		}

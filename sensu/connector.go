@@ -7,6 +7,7 @@ import (
 
 	"github.com/juju/errors"
 	"github.com/paramite/collectd-sensubility/config"
+	"github.com/rs/zerolog"
 	"github.com/streadway/amqp"
 )
 
@@ -35,6 +36,7 @@ type Connector struct {
 	ClientName        string
 	ClientAddress     string
 	KeepaliveInterval int
+	log               zerolog.Logger
 	queueName         string
 	exchangeName      string
 	inConnection      *amqp.Connection
@@ -45,7 +47,7 @@ type Connector struct {
 	consumer          <-chan amqp.Delivery
 }
 
-func NewConnector(cfg *config.Config) (*Connector, error) {
+func NewConnector(cfg *config.Config, logger zerolog.Logger) (*Connector, error) {
 	var connector Connector
 	connector.Address = cfg.Sections["sensu"].Options["connection"].GetString()
 	connector.Subscription = cfg.Sections["sensu"].Options["subscriptions"].GetStrings(",")
@@ -53,6 +55,7 @@ func NewConnector(cfg *config.Config) (*Connector, error) {
 	connector.ClientAddress = cfg.Sections["sensu"].Options["client_address"].GetString()
 	connector.KeepaliveInterval = cfg.Sections["sensu"].Options["keepalive_interval"].GetInt()
 
+	connector.log = logger
 	connector.exchangeName = fmt.Sprintf("client:%s", connector.ClientName)
 	connector.queueName = fmt.Sprintf("%s-collectd-%d", connector.ClientName, time.Now().Unix())
 
@@ -165,7 +168,7 @@ func (self *Connector) Start(outchan chan interface{}, inchan chan interface{}) 
 			if err == nil {
 				outchan <- request
 			} else {
-				//TODO: log warning
+				self.log.Warn().Err(err).Bytes("request-body", req.Body).Msg("Failed to unmarshal request body.")
 			}
 		}
 	}()
@@ -177,7 +180,7 @@ func (self *Connector) Start(outchan chan interface{}, inchan chan interface{}) 
 			case Result:
 				body, err := json.Marshal(result)
 				if err != nil {
-					//TODO: log warning
+					self.log.Error().Err(err).Msg("Failed to marshal execution result.")
 					continue
 				}
 				err = self.outChannel.Publish(
@@ -194,10 +197,10 @@ func (self *Connector) Start(outchan chan interface{}, inchan chan interface{}) 
 						Priority:        0,              // 0-9
 					})
 				if err != nil {
-					//TODO: log warning
+					self.log.Error().Err(err).Msg("Failed to publish execution result.")
 				}
 			default:
-				//TODO: log warning
+				self.log.Error().Str("type", fmt.Sprintf("%t", res)).Msg("Received execution result with invalid type.")
 			}
 		}
 	}()
@@ -213,7 +216,7 @@ func (self *Connector) Start(outchan chan interface{}, inchan chan interface{}) 
 				Timestamp:    time.Now().Unix(),
 			})
 			if err != nil {
-				//TODO: log warning
+				self.log.Error().Err(err).Msg("Failed to marshal keepalive body.")
 				continue
 			}
 			err = self.outChannel.Publish(
@@ -230,7 +233,7 @@ func (self *Connector) Start(outchan chan interface{}, inchan chan interface{}) 
 					Priority:        0,              // 0-9
 				})
 			if err != nil {
-				//TODO: log warning
+				self.log.Error().Err(err).Msg("Failed to publish keepalive body.")
 			}
 			time.Sleep(time.Duration(self.KeepaliveInterval) * time.Second)
 		}
