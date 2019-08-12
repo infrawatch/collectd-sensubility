@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/juju/errors"
 	"github.com/paramite/collectd-sensubility/config"
 	"github.com/rs/zerolog"
 	"github.com/streadway/amqp"
@@ -61,7 +60,7 @@ func NewConnector(cfg *config.Config, logger zerolog.Logger) (*Connector, error)
 
 	err := connector.Connect()
 	if err != nil {
-		return nil, errors.Trace(err)
+		return nil, err
 	}
 	return &connector, nil
 }
@@ -70,22 +69,22 @@ func (self *Connector) Connect() error {
 	var err error
 	self.inConnection, err = amqp.Dial(self.Address)
 	if err != nil {
-		return errors.Trace(err)
+		return err
 	}
 
 	self.outConnection, err = amqp.Dial(self.Address)
 	if err != nil {
-		return errors.Trace(err)
+		return err
 	}
 
 	self.inChannel, err = self.inConnection.Channel()
 	if err != nil {
-		return errors.Trace(err)
+		return err
 	}
 
 	self.outChannel, err = self.outConnection.Channel()
 	if err != nil {
-		return errors.Trace(err)
+		return err
 	}
 
 	// declare an exchange for this client
@@ -99,7 +98,7 @@ func (self *Connector) Connect() error {
 		nil,               // arguments
 	)
 	if err != nil {
-		return errors.Trace(err)
+		return err
 	}
 
 	// declare a queue for this client
@@ -112,7 +111,7 @@ func (self *Connector) Connect() error {
 		nil,            // arguments
 	)
 	if err != nil {
-		return errors.Trace(err)
+		return err
 	}
 
 	// register consumer
@@ -126,7 +125,7 @@ func (self *Connector) Connect() error {
 		nil,             // args
 	)
 	if err != nil {
-		return errors.Trace(err)
+		return err
 	}
 
 	// bind client queue with subscriptions
@@ -139,7 +138,7 @@ func (self *Connector) Connect() error {
 			nil,
 		)
 		if err != nil {
-			return errors.Trace(err)
+			return err
 		}
 	}
 

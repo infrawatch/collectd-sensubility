@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juju/errors"
 	"github.com/paramite/collectd-sensubility/config"
 	"github.com/rs/zerolog"
 )
@@ -54,7 +53,7 @@ func NewExecutor(cfg *config.Config, logger zerolog.Logger) (*Executor, error) {
 	if _, err := os.Stat(executor.TmpBaseDir); os.IsNotExist(err) {
 		err := os.MkdirAll(executor.TmpBaseDir, 0700)
 		if err != nil {
-			return nil, errors.Trace(err)
+			return nil, err
 		}
 	}
 	return &executor, nil

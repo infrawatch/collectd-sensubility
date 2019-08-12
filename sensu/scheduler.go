@@ -5,7 +5,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/juju/errors"
 	"github.com/paramite/collectd-sensubility/config"
 	"github.com/rs/zerolog"
 )
@@ -33,7 +32,7 @@ func NewScheduler(cfg *config.Config, logger zerolog.Logger) (*Scheduler, error)
 	scheduler.log = logger
 	err := json.Unmarshal(cfg.Sections["sensu"].Options["checks"].GetBytes(), &scheduler.Checks)
 	if err != nil {
-		return nil, errors.Trace(err)
+		return nil, err
 	}
 	return &scheduler, nil
 }
