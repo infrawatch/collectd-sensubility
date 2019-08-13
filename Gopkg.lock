@@ -26,18 +26,6 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:ff8c32bee60523e39cd04e58b14fae0c3d6adcbc419e9e0c3d991af0390ab270"
-  name = "github.com/rs/zerolog"
-  packages = [
-    ".",
-    "internal/cbor",
-    "internal/json",
-  ]
-  pruneopts = "UT"
-  revision = "acf3980132bfcdc48638724e6e3d9e5749b85999"
-  version = "v1.14.3"
-
-[[projects]]
   branch = "master"
   digest = "1:d6bb6f3240a488ffe5bb6952b513569d009927dcb20ff94885f87b76cef2b698"
   name = "github.com/streadway/amqp"
@@ -58,7 +46,6 @@
   analyzer-version = 1
   input-imports = [
     "github.com/go-ini/ini",
-    "github.com/rs/zerolog",
     "github.com/streadway/amqp",
     "github.com/stretchr/testify/assert",
   ]

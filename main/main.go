@@ -6,38 +6,41 @@ import (
 	"os"
 
 	"github.com/paramite/collectd-sensubility/config"
+	"github.com/paramite/collectd-sensubility/logging"
 	"github.com/paramite/collectd-sensubility/sensu"
-	"github.com/rs/zerolog"
 )
 
 const DEFAULT_CONFIG_PATH = "/etc/collectd-sensubility.conf"
 
 func main() {
 	debug := flag.Bool("debug", false, "enables debugging logs")
-	verbose := flag.Bool("verbose", false, "enables debugging logs")
+	verbose := flag.Bool("verbose", false, "enables informational logs")
+	silent := flag.Bool("silent", false, "disables all logs except fatal errors")
 	logpath := flag.String("log", "/var/log/collectd/sensubility.log", "path to log file")
 	flag.Parse()
 
 	// set logging
-	logfile, err := os.OpenFile(*logpath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	defer logfile.Close()
+	level := logging.WARN
+	if *verbose {
+		level = logging.INFO
+	} else if *debug {
+		level = logging.DEBUG
+	} else if *silent {
+		level = logging.ERROR
+	}
+	log, err := logging.NewLogger(level, *logpath)
 	if err != nil {
 		fmt.Printf("Failed to open log file %s.\n", *logpath)
 		os.Exit(2)
 	}
-	zerolog.SetGlobalLevel(zerolog.WarnLevel)
-	if *verbose {
-		zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	} else if *debug {
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-	}
-	log := zerolog.New(logfile).With().Timestamp().Logger()
+	defer log.Destroy()
 
 	// spawn entities
 	metadata := config.GetAgentConfigMetadata()
-	cfg, err := config.NewConfig(metadata, log.With().Str("component", "config-parser").Logger())
+	cfg, err := config.NewConfig(metadata, *log)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to parse config file.")
+		log.Metadata(map[string]interface{}{"error": err})
+		log.Error("Failed to parse config file.")
 		os.Exit(2)
 	}
 	confPath := os.Getenv("COLLECTD_SENSUBILITY_CONFIG")
@@ -48,22 +51,25 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
-	sensuConnector, err := sensu.NewConnector(cfg, log.With().Str("component", "sensu-connector").Logger())
+	sensuConnector, err := sensu.NewConnector(cfg, *log)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to spawn RabbitMQ connector.")
+		log.Metadata(map[string]interface{}{"error": err})
+		log.Error("Failed to spawn RabbitMQ connector.")
 		os.Exit(2)
 	}
 	defer sensuConnector.Disconnect()
 
-	sensuScheduler, err := sensu.NewScheduler(cfg, log.With().Str("component", "sensu-scheduler").Logger())
+	sensuScheduler, err := sensu.NewScheduler(cfg, *log)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to spawn check scheduler.")
+		log.Metadata(map[string]interface{}{"error": err})
+		log.Error("Failed to spawn check scheduler.")
 		os.Exit(2)
 	}
 
-	sensuExecutor, err := sensu.NewExecutor(cfg, log.With().Str("component", "sensu-executor").Logger())
+	sensuExecutor, err := sensu.NewExecutor(cfg, log)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to spawn check executor.")
+		log.Metadata(map[string]interface{}{"error": err})
+		log.Error("Failed to spawn check executor.")
 		os.Exit(2)
 	}
 	defer sensuExecutor.Clean()

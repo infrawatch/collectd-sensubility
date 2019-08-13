@@ -1,11 +1,15 @@
 package tests
 
 import (
+	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
+	"path"
 	"testing"
 
 	"github.com/paramite/collectd-sensubility/config"
+	"github.com/paramite/collectd-sensubility/logging"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -32,11 +36,16 @@ type validatorTest struct {
 
 func TestConfigValues(t *testing.T) {
 	// create temporary config file
-	file, err := ioutil.TempFile(".", "config_test")
+	tmpdir, err := ioutil.TempDir(".", "config_test")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer os.RemoveAll(tmpdir)
+	logpath := path.Join(tmpdir, "test.log")
+	file, err := ioutil.TempFile(tmpdir, "test.conf")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(file.Name())
 	// save test content
 	file.WriteString(CONFIG_CONTENT)
 	err = file.Close()
@@ -44,8 +53,15 @@ func TestConfigValues(t *testing.T) {
 		t.Fatal(err)
 	}
 	// test parsing
+	log, err := logging.NewLogger(logging.DEBUG, logpath)
+	if err != nil {
+		fmt.Printf("Failed to open log file %s.\n", logpath)
+		os.Exit(2)
+	}
+	defer log.Destroy()
+
 	metadata := config.GetAgentConfigMetadata()
-	conf, err := config.NewConfig(metadata)
+	conf, err := config.NewConfig(metadata, log)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,11 +86,24 @@ func TestConfigValues(t *testing.T) {
 
 func TestValidators(t *testing.T) {
 	// create temporary config file
-	file, err := ioutil.TempFile(".", "config_test")
+	tmpdir, err := ioutil.TempDir(".", "config_test")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer os.RemoveAll(tmpdir)
+	logpath := path.Join(tmpdir, "test.log")
+	file, err := ioutil.TempFile(tmpdir, "test.conf")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(file.Name())
+
+	log, err := logging.NewLogger(logging.DEBUG, logpath)
+	if err != nil {
+		fmt.Printf("Failed to open log file %s.\n", logpath)
+		os.Exit(2)
+	}
+	defer log.Destroy()
+
 	// save test content
 	file.WriteString(CONFIG_CONTENT)
 	err = file.Close()
@@ -94,7 +123,7 @@ func TestValidators(t *testing.T) {
 				config.Parameter{test.parameter, test.defValue, []config.Validator{test.validator}},
 			},
 		}
-		conf, err := config.NewConfig(metadata)
+		conf, err := config.NewConfig(metadata, log)
 		err = conf.Parse(file.Name())
 		if err == nil {
 			t.Errorf("Failed to report validation error with %s.", test.parameter)
@@ -106,7 +135,7 @@ func TestValidators(t *testing.T) {
 			config.Parameter{"default_test", "default", []config.Validator{config.IntValidatorFactory()}},
 		},
 	}
-	_, err = config.NewConfig(metadata)
+	_, err = config.NewConfig(metadata, log)
 	if err == nil {
 		t.Errorf("Failed to report validation error in constructor.")
 	}

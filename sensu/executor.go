@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/paramite/collectd-sensubility/config"
-	"github.com/rs/zerolog"
+	"github.com/paramite/collectd-sensubility/logging"
 )
 
 const (
@@ -38,11 +38,11 @@ type Executor struct {
 	ClientName  string
 	TmpBaseDir  string
 	ShellPath   string
-	log         zerolog.Logger
+	log         *logging.Logger
 	scriptCache map[string]string
 }
 
-func NewExecutor(cfg *config.Config, logger zerolog.Logger) (*Executor, error) {
+func NewExecutor(cfg *config.Config, logger *logging.Logger) (*Executor, error) {
 	var executor Executor
 	executor.ClientName = cfg.Sections["sensu"].Options["client_name"].GetString()
 	executor.TmpBaseDir = cfg.Sections["sensu"].Options["tmp_base_dir"].GetString()
@@ -74,7 +74,8 @@ func (self *Executor) Execute(request CheckRequest) (Result, error) {
 		}
 		self.scriptCache[request.Command] = scriptFile.Name()
 		scriptFile.Close()
-		self.log.Debug().Str("command", request.Command).Str("path", scriptFile.Name()).Msg("Created check script.")
+		self.log.Metadata(map[string]interface{}{"command": request.Command, "path": scriptFile.Name()})
+		self.log.Debug("Created check script.")
 	}
 
 	//cmdParts := strings.Split(request.Command, " ")
@@ -115,11 +116,13 @@ func (self *Executor) Execute(request CheckRequest) (Result, error) {
 		},
 	}
 
-	self.log.Debug().Str("command", request.Command).Int("status", status).Msg("Executed check script.")
+	self.log.Metadata(map[string]interface{}{"command": request.Command, "status": status})
+	self.log.Debug("Executed check script.")
 	return result, nil
 }
 
 func (self *Executor) Clean() {
 	os.Remove(self.TmpBaseDir)
-	self.log.Debug().Str("dir", self.TmpBaseDir).Msg("Removed temporary directory.")
+	self.log.Metadata(map[string]interface{}{"dir": self.TmpBaseDir})
+	self.log.Debug("Removed temporary directory.")
 }
