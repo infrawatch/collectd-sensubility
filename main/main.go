@@ -37,7 +37,7 @@ func main() {
 
 	// spawn entities
 	metadata := config.GetAgentConfigMetadata()
-	cfg, err := config.NewConfig(metadata, *log)
+	cfg, err := config.NewConfig(metadata, log)
 	if err != nil {
 		log.Metadata(map[string]interface{}{"error": err})
 		log.Error("Failed to parse config file.")
@@ -51,7 +51,7 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
-	sensuConnector, err := sensu.NewConnector(cfg, *log)
+	sensuConnector, err := sensu.NewConnector(cfg, log)
 	if err != nil {
 		log.Metadata(map[string]interface{}{"error": err})
 		log.Error("Failed to spawn RabbitMQ connector.")
@@ -59,7 +59,7 @@ func main() {
 	}
 	defer sensuConnector.Disconnect()
 
-	sensuScheduler, err := sensu.NewScheduler(cfg, *log)
+	sensuScheduler, err := sensu.NewScheduler(cfg, log)
 	if err != nil {
 		log.Metadata(map[string]interface{}{"error": err})
 		log.Error("Failed to spawn check scheduler.")
@@ -93,12 +93,20 @@ func main() {
 					res, err := sensuExecutor.Execute(req)
 					if err != nil {
 						reqstr := fmt.Sprintf("Request{name=%s, command=%s, issued=%d}", req.Name, req.Command, req.Issued)
-						log.Error().Err(err).Str("request", reqstr).Msg("Failed to execute requested command.")
+						log.Metadata(map[string]interface{}{
+							"error":   err,
+							"request": reqstr,
+						})
+						log.Error("Failed to execute requested command.")
 						continue
 					}
 					results <- res
 				default:
-					log.Error().Err(err).Str("request", fmt.Sprintf("%v", req)).Msg("Failed to execute requested command.")
+					log.Metadata(map[string]interface{}{
+						"error":   err,
+						"request": req,
+					})
+					log.Error("Failed to execute requested command.")
 				}
 			}
 		}()
