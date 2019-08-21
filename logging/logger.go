@@ -1,9 +1,9 @@
 package logging
 
 import (
+	"bytes"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -51,7 +51,9 @@ func (self *Logger) Metadata(metadata map[string]interface{}) {
 }
 
 func (self *Logger) formatMetadata() (string, error) {
-	var build strings.Builder
+	//var build strings.Builder
+	// Note: we need to support go-1.9.2 because of CentOS7
+	var build bytes.Buffer
 	if len(self.metadata) > 0 {
 		joiner := ""
 		for key, item := range self.metadata {
@@ -75,7 +77,9 @@ func (self *Logger) writeRecord(level LogLevel, message string) error {
 		return err
 	}
 
-	var build strings.Builder
+	//var build strings.Builder
+	// Note: we need to support go-1.9.2 because of CentOS7
+	var build bytes.Buffer
 	if self.Timestamp {
 		_, err = build.WriteString(time.Now().Format("2006-01-02 15:04:05 "))
 	}
