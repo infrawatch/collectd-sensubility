@@ -1,5 +1,8 @@
 # collectd-sensubility
 
+[![Coverage Status](https://coveralls.io/repos/github/paramite/collectd-sensubility/badge.svg?branch=master)](https://coveralls.io/github/paramite/collectd-sensubility?branch=master)
+[![Build Status](https://travis-ci.org/paramite/collectd-sensubility.svg?branch=master)](https://travis-ci.org/paramite/collectd-sensubility)
+
 ## Project's goal
 
 Sensubility's goal is to provide smooth transition from Ruby Sensu-based availability monitoring solution to SAF-based

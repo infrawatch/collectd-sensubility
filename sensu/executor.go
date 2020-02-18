@@ -1,12 +1,11 @@
 package sensu
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"strings"
+	"syscall"
 	"time"
 
 	"github.com/paramite/collectd-sensubility/config"
@@ -14,9 +13,9 @@ import (
 )
 
 const (
-	CHECK_OK     = 0
-	CHECK_WARN   = 1
-	CHECK_FAILED = 2
+	ExitCodeSuccess = iota
+	ExitCodeWarning
+	ExitCodeFailure
 )
 
 type CheckResult struct {
@@ -86,23 +85,24 @@ func (self *Executor) Execute(request CheckRequest) (Result, error) {
 	//		args = append(args, part)
 	//	}
 	//}
-	var stdout, stderr bytes.Buffer
 	cmd := exec.Command(self.ShellPath, self.scriptCache[request.Command])
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
 	start := time.Now()
-	err := cmd.Run()
+	output, err := cmd.CombinedOutput()
 	duration := time.Since(start)
-
-	cmdOut, cmdErr := stdout.String(), stderr.String()
-	status := CHECK_OK
+	status := ExitCodeSuccess
 	if err != nil {
-		status = CHECK_FAILED
-	} else if strings.TrimSpace(cmdErr) != "" {
-		status = CHECK_WARN
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			if ws, ok := exitErr.Sys().(syscall.WaitStatus); ok {
+				status = ws.ExitStatus()
+			} else {
+				status = ExitCodeFailure
+			}
+		} else {
+			status = ExitCodeFailure
+		}
 	}
 
+	outStr := string(output)
 	result := Result{
 		Client: self.ClientName,
 		Check: CheckResult{
@@ -111,12 +111,16 @@ func (self *Executor) Execute(request CheckRequest) (Result, error) {
 			Issued:   request.Issued,
 			Executed: start.Unix(),
 			Duration: duration.Seconds(),
-			Output:   cmdOut + cmdErr,
+			Output:   outStr,
 			Status:   status,
 		},
 	}
 
-	self.log.Metadata(map[string]interface{}{"command": request.Command, "status": status})
+	self.log.Metadata(map[string]interface{}{
+		"command": request.Command,
+		"status":  status,
+		"output":  outStr,
+	})
 	self.log.Debug("Executed check script.")
 	return result, nil
 }
