@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/go-ini/ini"
-	"github.com/paramite/collectd-sensubility/logging"
+	"github.com/infrawatch/collectd-sensubility/logging"
 )
 
 const (
