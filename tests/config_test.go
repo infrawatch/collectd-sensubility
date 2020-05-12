@@ -18,6 +18,13 @@ var CONFIG_CONTENT = `
 log_file=/var/tmp/test.log
 allow_exec=false
 
+[sensu]
+checks={"checks":
+				{"test":
+					{"command": "echo 'one'; echo 'two'"}
+				}
+		  }
+
 [amqp1]
 port=666
 
@@ -81,6 +88,9 @@ func TestConfigValues(t *testing.T) {
 	assert.Equal(t, "/var/tmp/test.log", conf.Sections["default"].Options["log_file"].GetString(), "Did not parse correctly")
 	assert.Equal(t, false, conf.Sections["default"].Options["allow_exec"].GetBool(), "Did not parse correctly")
 	assert.Equal(t, 666, conf.Sections["amqp1"].Options["port"].GetInt(), "Did not parse correctly")
+
+	checks := "{\"checks\":\n{\"test\":\n{\"command\": \"echo 'one'; echo 'two'\"}\n}\n}"
+	assert.Equal(t, checks, conf.Sections["sensu"].Options["checks"].GetString(), "Did not parse correctly")
 	os.Remove(file.Name())
 }
 

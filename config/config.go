@@ -192,7 +192,11 @@ func NewConfig(metadata map[string][]Parameter, logger *logging.Logger) (*Config
 }
 
 func (conf *Config) Parse(path string) error {
-	data, err := ini.LoadSources(ini.LoadOptions{AllowPythonMultilineValues: true}, path) //ini.Load(path)
+	options := ini.LoadOptions{
+		AllowPythonMultilineValues: true,
+		IgnoreInlineComment:        true,
+	}
+	data, err := ini.LoadSources(options, path)
 	if err != nil {
 		return err
 	}
