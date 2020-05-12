@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/paramite/collectd-sensubility/config"
-	"github.com/paramite/collectd-sensubility/logging"
+	"github.com/infrawatch/collectd-sensubility/config"
+	"github.com/infrawatch/collectd-sensubility/logging"
 	"github.com/streadway/amqp"
 )
 

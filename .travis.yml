@@ -8,7 +8,7 @@ env:
   global:
     - RABBITMQ_VERSION=3.7.24
     - QDROUTERD_VERSION=1.7.0
-    - secure: "M7B+sKIyMGZ4Suf/Hnc+jRhwxq/Ch12eUVsdby2ipkZU80CaIz5jd/+pJT1SDQmPeoapJVTjuR8LhRkDyHtSysdY4n3kV6sW4OFJU82vyuEMHVMYg6TkXzGqUCZqpcO9oUREhlU0wH6IVZi0I01ervthgYyocS2Q4RQPVnk/NcTiZ2LTqKJ0Y38/BKpspYuTV2EPwfolrjTcfVypNl51TdKLawYP5MKLJmNMwEYnioGTQ8i0313jbnk0g80rq2UmBQXZcuiK2uXE9ap/7xuyR1IJB7iMIcAs5DN6YxzdLhJR5Qvv7YLSBNa+XhYMGfgHISp2Pnd8lSryCmiCFLirZxujD5WbsyMvpq8VaXLg+m5bdmWTONb7Jd+obOnD9Fa4/JUUqGmkPErwYMdWZOhykyO96pJnPrJ8yqmeRtjuMA3qHyoqZj2zJSzsuG75Jt0W3A72YVLiyQgRSdBRuQHyDpeySTYz7D3VWu68CkrXjPhWJGicNQbNqMXvE9fMgqwHes7u2GUWuusf3pEWf7WVqX/kBfI5Hjzk/HhSfSyYdgpI3bA1k6nrdAMYH/H9Yg0B96vQI0qwmxhiUKgGhLLk2FmsEgSKqV5Oa3/EZ9gsHRcn2Z6uRqvkw1A7/bYlz+y3Ln2wtKb/sIU+SxbP8cnCfTOOtjgNwWMbdbtt7a7Un1g="
+    - secure: "hX0ySeoZQyDHbe/QVGNdWO/VpowZ/vwoF1fdcUSJwdpmsEu5lpj/VNFfd/M+h82aO+8V6idLc5h9Pccc0w0w0wnJnu0QoBUmDpfQ5yBmtZybhln/oQhljgISfdLfL8HEh0I+gwfoN8nmmajk52m0g/6jue6+rZAI9eeZjUgL6ED03F+OytJcmcn8Kt6bbIWl4KFgoh9++l+EBradfcW9jew3gjVSvSqFJx7vOYGMmOMDg9jjAqGsmTmjiRCeaSZGgpQrZcNdyspekDgxjtdgVtGo1vxphNHUvbrkOXWPKFwoBVDLwXnaLt7jQpCqk8j+H4J6CK87JmNDLLqOR/wayQ6Aq+BA2oe53U65q24aWUrhlMzcYBK/g3v+h6s6nWdtEk2B74+MlEXIHryjjSk/xBOdceRpxib9PZ65bAdJ/vmQ+mHCrYB4waxmWZqkRL+wEeLYtdq5aZ0228IVgLTfuqJSRBBowQh8F5bRvY7pILIfaLdQ/VEqLkro2Xuc2tLDrIfHBoEq7S5Ox6v1+adIxLRF6k+ihgJGiJIkjsNK6q4ILY3O7uli5V8YYMFidN4teBTeruY4Z5mI3v9eyxt6erb3ku6KoY+b0nEIfL64Fb7Tmq76WSqEQx0rzbX7q02aQA0GQvTO4Z7XGyP0MaW4mPSApfQcjg+9YXjOVTodDYE="
 services:
   - docker
 
@@ -39,7 +39,7 @@ before_script:
 after_script:
   - bash ci/report_coverage.sh
 
-# run CI and report test coverage after successful test run
+# run CI
 script:
-  - export PROJECT_ROOT=/root/go/src/github.com/paramite/collectd-sensubility
+  - export PROJECT_ROOT=/root/go/src/github.com/infrawatch/collectd-sensubility
   - docker run -uroot --network host -it --volume $PWD:$PROJECT_ROOT:z --workdir $PROJECT_ROOT centos:7 bash ci/run_ci.sh

@@ -9,7 +9,7 @@ import (
 	"path"
 	"testing"
 
-	"github.com/paramite/collectd-sensubility/logging"
+	"github.com/infrawatch/collectd-sensubility/logging"
 	"github.com/stretchr/testify/assert"
 )
 

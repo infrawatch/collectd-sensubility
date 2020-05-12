@@ -1,12 +1,12 @@
 # collectd-sensubility
 
-[![Coverage Status](https://coveralls.io/repos/github/paramite/collectd-sensubility/badge.svg?branch=master)](https://coveralls.io/github/paramite/collectd-sensubility?branch=master)
-[![Build Status](https://travis-ci.org/paramite/collectd-sensubility.svg?branch=master)](https://travis-ci.org/paramite/collectd-sensubility)
+[![Coverage Status](https://coveralls.io/repos/github/infrawatch/collectd-sensubility/badge.svg?branch=master)](https://coveralls.io/github/infrawatch/collectd-sensubility?branch=master)
+[![Build Status](https://travis-ci.org/infrawatch/collectd-sensubility.svg?branch=master)](https://travis-ci.org/infrawatch/collectd-sensubility)
 
 ## Project's goal
 
-Sensubility's goal is to provide smooth transition from Ruby Sensu-based availability monitoring solution to SAF-based
-(Service Assurance Framework) availability monitoring.
+Sensubility's goal is to provide smooth transition from Ruby Sensu-based availability monitoring solution to STF-based
+(Service Telemetry Framework) availability monitoring.
 
 Sensubility can be run either as standalone service, but it also behaves well with collectd and it's collectd-exec plugin.
 The agent behaves exactly the same as Ruby-based sensu-client does, eg. it connects to RabbitMQ message bus and listens
@@ -14,13 +14,13 @@ for check execution requests from Sensu server. Sensubility then executes the re
 to proper channel in RabbitMQ message bus.
 
 ## Features left to implement
-  - implement AMQP-1.0 connection to be able to report results to SAF server side
+  - implement AMQP-1.0 connection to be able to report results to STF server side
 
 ## Installation
 
 ### From source
 ```
-git clone https://github.com/paramite/collectd-sensubility
+git clone https://github.com/infrawatch/collectd-sensubility
 cd collectd-sensubility
 go get -u github.com/golang/dep/...
 dep ensure -v -vendor-only

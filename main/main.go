@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/paramite/collectd-sensubility/config"
-	"github.com/paramite/collectd-sensubility/logging"
-	"github.com/paramite/collectd-sensubility/sensu"
+	"github.com/infrawatch/collectd-sensubility/config"
+	"github.com/infrawatch/collectd-sensubility/logging"
+	"github.com/infrawatch/collectd-sensubility/sensu"
 )
 
 const DEFAULT_CONFIG_PATH = "/etc/collectd-sensubility.conf"
