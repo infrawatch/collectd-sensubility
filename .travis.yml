@@ -1,13 +1,13 @@
 ---
 
 dist: xenial
-language: go
-go:
-  - 1.13.3
+#language: go
+#go:
+#  - 1.13.3
 env:
   global:
     - RABBITMQ_VERSION=3.7.24
-    - QDROUTERD_VERSION=1.7.0
+    - QDROUTERD_VERSION=1.12.0
     - secure: "hX0ySeoZQyDHbe/QVGNdWO/VpowZ/vwoF1fdcUSJwdpmsEu5lpj/VNFfd/M+h82aO+8V6idLc5h9Pccc0w0w0wnJnu0QoBUmDpfQ5yBmtZybhln/oQhljgISfdLfL8HEh0I+gwfoN8nmmajk52m0g/6jue6+rZAI9eeZjUgL6ED03F+OytJcmcn8Kt6bbIWl4KFgoh9++l+EBradfcW9jew3gjVSvSqFJx7vOYGMmOMDg9jjAqGsmTmjiRCeaSZGgpQrZcNdyspekDgxjtdgVtGo1vxphNHUvbrkOXWPKFwoBVDLwXnaLt7jQpCqk8j+H4J6CK87JmNDLLqOR/wayQ6Aq+BA2oe53U65q24aWUrhlMzcYBK/g3v+h6s6nWdtEk2B74+MlEXIHryjjSk/xBOdceRpxib9PZ65bAdJ/vmQ+mHCrYB4waxmWZqkRL+wEeLYtdq5aZ0228IVgLTfuqJSRBBowQh8F5bRvY7pILIfaLdQ/VEqLkro2Xuc2tLDrIfHBoEq7S5Ox6v1+adIxLRF6k+ihgJGiJIkjsNK6q4ILY3O7uli5V8YYMFidN4teBTeruY4Z5mI3v9eyxt6erb3ku6KoY+b0nEIfL64Fb7Tmq76WSqEQx0rzbX7q02aQA0GQvTO4Z7XGyP0MaW4mPSApfQcjg+9YXjOVTodDYE="
 services:
   - docker
@@ -15,8 +15,8 @@ services:
 before_install:
   - docker pull centos:7
   # start containerized QDR
-  #- docker pull quay.io/interconnectedcloud/qdrouterd:$QDROUTERD_VERSION
-  #- docker run --name=qdr -p 5666:5666 -d quay.io/interconnectedcloud/qdrouterd:$QDROUTERD_VERSION
+  - docker pull quay.io/interconnectedcloud/qdrouterd:$QDROUTERD_VERSION
+  - docker run --name=qdr --volume=$PWD/ci/qdrouterd.conf:/etc/qpid-dispatch/qdrouterd.conf:ro -p 5666:5666 -d quay.io/interconnectedcloud/qdrouterd:$QDROUTERD_VERSION
   # start containerized RabbitMQ
   - docker pull rabbitmq:$RABBITMQ_VERSION
   - docker run --name=rabbitmq -p 5672:5672 -p 4369:4369 -d rabbitmq:$RABBITMQ_VERSION
@@ -26,14 +26,14 @@ before_install:
   - docker exec rabbitmq rabbitmqctl add_vhost /sensu
   - docker exec rabbitmq rabbitmqctl set_permissions -p "/sensu" guest ".*" ".*" ".*"
 
-install:
-  - go get -u golang.org/x/lint/golint
-  - go get -u github.com/golang/dep/...
-  - dep ensure -v
+#install:
+#  - go get -u golang.org/x/lint/golint
+#  - go get -u github.com/golang/dep/...
+#  - dep ensure -v
 
 # run unit test suit before smoke test
-before_script:
-  - go test -v ./...
+#before_script:
+#  - go test -v ./...
 
 # report test coverage after successful test run
 after_script:
