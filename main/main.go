@@ -10,7 +10,7 @@ import (
 	"github.com/infrawatch/apputils/config"
 	"github.com/infrawatch/apputils/connector"
 	"github.com/infrawatch/apputils/logging"
-
+	"github.com/infrawatch/collectd-sensubility/formats"
 	"github.com/infrawatch/collectd-sensubility/sensu"
 )
 
@@ -138,14 +138,20 @@ func GetAgentConfigMetadata() map[string][]config.Parameter {
 			config.Parameter{
 				Name:       "send_timeout",
 				Tag:        "",
-				Default:    5666,
+				Default:    2,
 				Validators: []config.Validator{config.IntValidatorFactory()},
 			},
 			config.Parameter{
-				Name:       "results_address",
+				Name:       "results_channel",
 				Tag:        "",
-				Default:    "collectd/checks",
+				Default:    "collectd/events",
 				Validators: []config.Validator{},
+			},
+			config.Parameter{
+				Name:       "results_format",
+				Tag:        "",
+				Default:    "smartgateway",
+				Validators: []config.Validator{config.StringOptionsValidatorFactory([]string{"smartgateway", "sensu"})},
 			},
 			config.Parameter{
 				Name:       "listen_channels",
@@ -206,11 +212,11 @@ func main() {
 	}
 
 	requests := make(chan interface{})
-	SensuResults := make(chan interface{})
-	AmqpResults := make(chan interface{})
+	sensuResults := make(chan interface{})
+	amqpResults := make(chan interface{})
 	wait := make(chan bool)
-	defer close(SensuResults)
-	defer close(AmqpResults)
+	defer close(sensuResults)
+	defer close(amqpResults)
 
 	reportSensu := false
 	sensuConnector := &connector.SensuConnector{}
@@ -224,14 +230,14 @@ func main() {
 					os.Exit(2)
 				}
 				defer sensuConnector.Disconnect()
-				sensuConnector.Start(requests, SensuResults)
+				sensuConnector.Start(requests, sensuResults)
 				reportSensu = true
 			}
 		}
 	}
 
 	reportAmqp := false
-	amqpAddr := "collectd/checks"
+	amqpAddr := "collectd/events"
 	amqpConnector := &connector.AMQP10Connector{}
 	if sect, ok := cfg.Sections["amqp1"]; ok {
 		if opt, ok := sect.Options["connection"]; ok {
@@ -249,16 +255,16 @@ func main() {
 					os.Exit(2)
 				}
 				defer amqpConnector.Disconnect()
-				amqpConnector.Start(requests, AmqpResults)
+				amqpConnector.Start(requests, amqpResults)
 				reportAmqp = true
 
-				addrOpt, err := cfg.GetOption("amqp1/results_address")
+				addrOpt, err := cfg.GetOption("amqp1/results_channel")
 				if err != nil || len(addrOpt.GetString()) <= 0 {
 					log.Metadata(map[string]interface{}{
 						"error":   err,
 						"default": amqpAddr,
 					})
-					log.Info("Failed to get amqp1/results_address configuration value. Using default value.")
+					log.Info("Failed to get amqp1/results_channel configuration value. Using default value.")
 				} else {
 					amqpAddr = addrOpt.GetString()
 				}
@@ -286,7 +292,7 @@ func main() {
 
 	workers := cfg.Sections["sensu"].Options["worker_count"].GetInt()
 	for i := int64(0); i < workers; i++ {
-		go func(amqpAddr *string) {
+		go func(amqpAddr *string, amqpResults chan interface{}) {
 			for {
 				req := <-requests
 				switch req := req.(type) {
@@ -302,11 +308,20 @@ func main() {
 						continue
 					}
 					if reportSensu {
-						SensuResults <- res
+						sensuResults <- res
 					}
 					if reportAmqp {
-						//TODO: Format message struct from the CheckResult and send it to AmqpResults
-						body, err := json.Marshal(res)
+						var body []byte
+						if cfg.Sections["amqp1"].Options["results_format"].GetString() == "sensu" {
+							body, err = json.Marshal(res)
+						} else {
+							sgres, errr := formats.CreateSGResult(res)
+							if errr == nil {
+								body, err = json.Marshal(sgres)
+							} else {
+								err = errr
+							}
+						}
 						if err != nil {
 							log.Metadata(map[string]interface{}{
 								"error":  err,
@@ -319,7 +334,7 @@ func main() {
 							Address: *amqpAddr,
 							Body:    string(body),
 						}
-						AmqpResults <- msg
+						amqpResults <- msg
 					}
 				default:
 					log.Metadata(map[string]interface{}{
@@ -329,7 +344,7 @@ func main() {
 					log.Error("Failed to execute requested command.")
 				}
 			}
-		}(&amqpAddr)
+		}(&amqpAddr, amqpResults)
 	}
 	<-wait
 }

@@ -16,14 +16,47 @@ from proton.reactor import Container
 
 
 CI_TEST_RESULTS = {
-    'standalone_check1': {'output': 'foobar\n', 'status': 2},
-    'standalone_check2': {'output': 'woobalooba\n', 'status': 0}
+    'standalone_check1': {
+        "labels": {
+            "check": "standalone_check1",
+            "severity": "FAILURE",
+        },
+        "annotations": {
+            "command": "echo 'foobar' \u0026\u0026 exit 2",
+            "output": 'foobar\n',
+            "status": 2
+        }
+    },
+    'standalone_check2': {
+        "labels": {
+            "check": "standalone_check2",
+            "severity": "OKAY"
+        },
+        "annotations": {
+            "command": "echo 'woobalooba' \u0026\u0026 exit 0",
+            "output": "woobalooba\n",
+            "status": 0
+        }
+    },
+
 }
 
 
 def timeout_handler(signum, frame):
     print("Verification timed out")
     sys.exit(2)
+
+
+def verify_deeply(addr, the_dict, value):
+    parts = addr.split('.', 1)
+    if parts[0] not in the_dict:
+        print(f"Expected key {parts[0]} was not found "
+              f"in received message: {the_dict}")
+        sys.exit(1)
+    if len(parts) == 1:
+        assert(the_dict[addr] == value)
+    else:
+        verify_deeply('.'.join(parts[1:]), the_dict[parts[0]], value)
 
 
 class Verifier(MessagingHandler):
@@ -45,40 +78,42 @@ class Verifier(MessagingHandler):
         signal.alarm(self.timeout)
 
     def on_link_opened(self, event):
-        print("RECEIVE: Created receiver for source address '{0}'".format
+        print("Created receiver for source address '{0}'".format
               (self.address))
 
     def on_message(self, event):
-        if self.received < self.expected:
-            try:
-                result = json.loads(event.message.body)
-                print(f"Verifying check result {result['check']['name']}")
-                assert(result['check']['name'] in CI_TEST_RESULTS)
-                print("Result name found in list of expected results.")
+        try:
+            result = json.loads(event.message.body)
+            if "labels" in result and "check" in result["labels"] and \
+                    result["labels"]["check"] in CI_TEST_RESULTS:
+                check_name = result["labels"]["check"]
+                self.hits.add(check_name)
 
-                for test in ("status", "output"):
-                    assert(CI_TEST_RESULTS[result['check']['name']][test] == result['check'][test])
-                    print(f"successful verification of {test} in result.")
+                template = CI_TEST_RESULTS[check_name]
+                for main_key in ("labels", "annotations"):
+                    for key, item in template[main_key].items():
+                        verify_deeply(f"{main_key}.{key}", result, item)
+                self.received += 1
+            else:
+                main_key, key, item = "labels", "check", "<N/A>"
+                raise AssertionError()
+        except AssertionError as ex:
+            print(f"Failed verification of {main_key}.{key} "
+                  f"(expected {item}) in result: {result}")
+            sys.exit(1)
 
-                if result['check']['name'] not in self.hits:
-                    self.received += 1
-                self.hits.add(result['check']['name'])
-            except AssertionError as ex:
-                print(f"Failed verification of {test} in result: {result}")
+        if self.received >= self.expected:
+            print("Verified!")
+            event.receiver.close()
+            event.connection.close()
+            if self.hits != set(CI_TEST_RESULTS.keys()):
+                print("Failed verification. Not all expected messages "
+                      "were received.")
                 sys.exit(1)
-
-            if self.received == self.expected:
-                print("Verified!")
-                event.receiver.close()
-                event.connection.close()
-                if self.hits != set(CI_TEST_RESULTS.keys()):
-                    print("Failed verification. Not all expected messages "
-                          "were received.")
-                    sys.exit(1)
 
 
 @click.command()
-@click.option('--amqp-url', required=True, default='amqp://127.0.0.1:5666/collectd/checks')
+@click.option('--amqp-url', required=True, default='amqp://127.0.0.1:5666/collectd/events')
 @click.option('--timeout', type=int, required=True, default=10)
 def main(amqp_url, timeout):
     trash, url = amqp_url.split('//', 1)

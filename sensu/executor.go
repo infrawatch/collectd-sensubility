@@ -20,6 +20,7 @@ const (
 	ExitCodeFailure
 )
 
+//Executor executes checks based on incoming requests
 type Executor struct {
 	ClientName  string
 	TmpBaseDir  string
@@ -28,6 +29,7 @@ type Executor struct {
 	scriptCache map[string]string
 }
 
+//NewExecutor creates and initialize executor struct
 func NewExecutor(cfg *config.INIConfig, logger *logging.Logger) (*Executor, error) {
 	var executor Executor
 	executor.ClientName = cfg.Sections["sensu"].Options["client_name"].GetString()
@@ -45,6 +47,7 @@ func NewExecutor(cfg *config.INIConfig, logger *logging.Logger) (*Executor, erro
 	return &executor, nil
 }
 
+//Execute prepares script for single check based on given the request and then executes it
 func (self *Executor) Execute(request connector.CheckRequest) (connector.CheckResult, error) {
 	// It is not possible to reasonably exec something like "cmd1 && cmd2 || exit 2".
 	// This is usual in Sensu framework so we need to make temporary script for each command.
