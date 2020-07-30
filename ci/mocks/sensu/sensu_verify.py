@@ -9,6 +9,7 @@ Fails the response is not received at all or in invalid format.
 import click
 import json
 import pika
+import signal
 import sys
 
 CI_TEST_RESULTS = {
@@ -19,31 +20,35 @@ CI_TEST_RESULTS = {
 }
 
 
+def timeout_handler(signum, frame):
+    print("Verification timed out")
+    sys.exit(2)
+
+
 @click.command()
 @click.option('--rabbit-url', required=True,
               default='amqp://guest:guest@127.0.0.1:5672/%2fsensu')
-def main(rabbit_url):
+@click.option('--timeout', type=int, required=True, default=10)
+def main(rabbit_url, timeout):
     connection = pika.BlockingConnection(pika.URLParameters(rabbit_url))
     channel = connection.channel()
+
+    signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(timeout)
 
     try:
         hits = set()
         for method, properties, body in channel.consume('results'):
             channel.basic_ack(method.delivery_tag)
             result = json.loads(body)
-            print(f"Verifying check result {result['check']['name']}")
 
-            test = "name"
+            print(f"Verifying check result {result['check']['name']}")
             assert(result['check']['name'] in CI_TEST_RESULTS)
-            print(f"successful verification of {test} in result.")
-            status = "status"
-            assert(CI_TEST_RESULTS[result['check']['name']]
-                   ['status'] == result['check']['status'])
-            print(f"successful verification of {test} in result.")
-            test = "output"
-            assert(CI_TEST_RESULTS[result['check']['name']]
-                   ['output'] == result['check']['output'])
-            print(f"successful verification of {test} in result.")
+            print("Result name found in list of expected results.")
+
+            for test in ("status", "output"):
+                assert(CI_TEST_RESULTS[result['check']['name']][test] == result['check'][test])
+                print(f"successful verification of {test} in result.")
 
             hits.add(result['check']['name'])
             if hits == set(CI_TEST_RESULTS.keys()):

@@ -2,52 +2,61 @@
 
 
 [[projects]]
-  digest = "1:ffe9824d294da03b391f44e1ae8281281b4afc1bdaa9588c9097785e3af10cec"
-  name = "github.com/davecgh/go-spew"
-  packages = ["spew"]
-  pruneopts = "UT"
-  revision = "8991bc29aa16c548c550c7ff78260e27b9ab7c73"
-  version = "v1.1.1"
-
-[[projects]]
-  digest = "1:00f2a9df72922aa64eae4037597f8fde82ffb86a9734e16b6a59598aa38278f9"
+  digest = "1:2a8ce9278a57dba0bca00383d26744e88324c2696ad8538b3f7a69067d02d78c"
   name = "github.com/go-ini/ini"
   packages = ["."]
   pruneopts = "UT"
-  revision = "8659100d2d9ecf3760a41838b1886db49426d001"
-  version = "v1.44.0"
+  revision = "1fc6efb6f20ef065ae00baf7f4fa7722cad0ec34"
+  version = "v1.57.0"
 
 [[projects]]
-  digest = "1:0028cb19b2e4c3112225cd871870f2d9cf49b9b4276531f03438a88e94be86fe"
-  name = "github.com/pmezard/go-difflib"
-  packages = ["difflib"]
+  digest = "1:582b704bebaa06b48c29b0cec224a6058a09c86883aaddabde889cd1a5f73e1b"
+  name = "github.com/google/uuid"
+  packages = ["."]
   pruneopts = "UT"
-  revision = "792786c7400a136282c1664665ae0a8db921c6c2"
-  version = "v1.0.0"
+  revision = "0cd6bf5da1e1c83f8b45653022c74f71af0538a4"
+  version = "v1.1.1"
 
 [[projects]]
   branch = "master"
-  digest = "1:d6bb6f3240a488ffe5bb6952b513569d009927dcb20ff94885f87b76cef2b698"
+  digest = "1:01c7fb104935e3cf6e32637ba2b4a015ffb4cb36e08374a9c56d48e4f88b7bc1"
+  name = "github.com/infrawatch/apputils"
+  packages = [
+    "config",
+    "connector",
+    "logging",
+  ]
+  pruneopts = "UT"
+  revision = "d8a8f9d69983c75dd3e4fb3eca17de3b5fed5592"
+
+[[projects]]
+  digest = "1:5ca236e4ecfeb92a57b7a4c7f139023384e7f726640f61b17820473cc82dfb77"
   name = "github.com/streadway/amqp"
   packages = ["."]
   pruneopts = "UT"
-  revision = "75d898a42a940fbc854dfd1a4199eabdc00cf024"
+  revision = "1c71cc93ed716f9a6f4c2ae8955c25f9176d9f19"
+  version = "v1.0.0"
 
 [[projects]]
-  digest = "1:972c2427413d41a1e06ca4897e8528e5a1622894050e2f527b38ddf0f343f759"
-  name = "github.com/stretchr/testify"
-  packages = ["assert"]
+  branch = "go1"
+  digest = "1:8891472a79c8ba147f22c847f6ee30a6fc17be2542b74511f69fbb98c2295772"
+  name = "qpid.apache.org"
+  packages = [
+    "amqp",
+    "electron",
+    "proton",
+  ]
   pruneopts = "UT"
-  revision = "ffdc059bfe9ce6a4e144ba849dbedead332c6053"
-  version = "v1.3.0"
+  revision = "7bf92569070b69a52dc8ff2cf0c2635e9d5bbf3a"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
-    "github.com/go-ini/ini",
-    "github.com/streadway/amqp",
-    "github.com/stretchr/testify/assert",
+    "github.com/google/uuid",
+    "github.com/infrawatch/apputils/config",
+    "github.com/infrawatch/apputils/connector",
+    "github.com/infrawatch/apputils/logging",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -5,29 +5,33 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/infrawatch/collectd-sensubility/config"
-	"github.com/infrawatch/collectd-sensubility/logging"
+	"github.com/infrawatch/apputils/config"
+	"github.com/infrawatch/apputils/connector"
+	"github.com/infrawatch/apputils/logging"
 )
 
+// Check holds data for single Sensu check to be scheduled
 type Check struct {
 	Command      string   `json:"command"`
 	Subscribers  []string `json:"subscribers"`
 	Interval     int      `json:"interval"`
 	Timeout      int      `json:"timeout"`
-	Ttl          int      `json:"ttl"`
-	Ttl_status   int      `json:"ttl_status"`
+	TTL          int      `json:"ttl"`
+	TTLStatus    int      `json:"ttl_status"`
 	Occurrences  int      `json:"occurrences"`
 	Refresh      int      `json:"refresh"`
 	Handlers     []string `json:"handlers"`
 	Dependencies []string `json:"dependencies"`
 }
 
+// Scheduler holds data for scheduling standaline checks
 type Scheduler struct {
 	Checks map[string]Check
 	log    *logging.Logger
 }
 
-func NewScheduler(cfg *config.Config, logger *logging.Logger) (*Scheduler, error) {
+// NewScheduler creates Sensu standalone check scheduler according to configuration
+func NewScheduler(cfg *config.INIConfig, logger *logging.Logger) (*Scheduler, error) {
 	var scheduler Scheduler
 	scheduler.log = logger
 	err := json.Unmarshal(cfg.Sections["sensu"].Options["checks"].GetBytes(), &scheduler.Checks)
@@ -37,15 +41,15 @@ func NewScheduler(cfg *config.Config, logger *logging.Logger) (*Scheduler, error
 	return &scheduler, nil
 }
 
-// Schedules tickers to each check which will send the results to outchan.
-func (self *Scheduler) Start(outchan chan interface{}) {
+// Start schedules tickers to each check which will send the results to outchan.
+func (sched *Scheduler) Start(outchan chan interface{}) {
 	// dynamically create select cases together with corresponding check names
 	checks := []string{}
 	cases := []reflect.SelectCase{}
-	for name, data := range self.Checks {
+	for name, data := range sched.Checks {
 		if data.Interval < 1 {
-			self.log.Metadata(map[string]interface{}{"check": name, "interval": data.Interval})
-			self.log.Warn("Configuration contains invalid interval.")
+			sched.log.Metadata(map[string]interface{}{"check": name, "interval": data.Interval})
+			sched.log.Warn("Configuration contains invalid interval.")
 			continue
 		}
 		//TODO: use rather time.NewTicker() to be able to ticker.Stop() all tickers in Scheduler.Stop()
@@ -60,10 +64,10 @@ func (self *Scheduler) Start(outchan chan interface{}) {
 		for {
 			index, _, _ := reflect.Select(cases)
 			// request check execution
-			self.log.Metadata(map[string]interface{}{"check": checks[index]})
-			self.log.Debug("Requesting execution of check.")
-			outchan <- CheckRequest{
-				Command: self.Checks[checks[index]].Command,
+			sched.log.Metadata(map[string]interface{}{"check": checks[index]})
+			sched.log.Debug("Requesting execution of check.")
+			outchan <- connector.CheckRequest{
+				Command: sched.Checks[checks[index]].Command,
 				Name:    checks[index],
 				Issued:  time.Now().Unix(),
 			}

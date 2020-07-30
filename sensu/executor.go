@@ -8,31 +8,19 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/infrawatch/collectd-sensubility/config"
-	"github.com/infrawatch/collectd-sensubility/logging"
+	"github.com/infrawatch/apputils/config"
+	"github.com/infrawatch/apputils/connector"
+	"github.com/infrawatch/apputils/logging"
 )
 
+// Standard Sensu return codes
 const (
 	ExitCodeSuccess = iota
 	ExitCodeWarning
 	ExitCodeFailure
 )
 
-type CheckResult struct {
-	Command  string  `json:"command"`
-	Name     string  `json:"name"`
-	Issued   int64   `json:"issued"`
-	Executed int64   `json:"executed"`
-	Duration float64 `json:"duration"`
-	Output   string  `json:"output"`
-	Status   int     `json:"status"`
-}
-
-type Result struct {
-	Client string      `json:"client"`
-	Check  CheckResult `json:"check"`
-}
-
+//Executor executes checks based on incoming requests
 type Executor struct {
 	ClientName  string
 	TmpBaseDir  string
@@ -41,7 +29,8 @@ type Executor struct {
 	scriptCache map[string]string
 }
 
-func NewExecutor(cfg *config.Config, logger *logging.Logger) (*Executor, error) {
+//NewExecutor creates and initialize executor struct
+func NewExecutor(cfg *config.INIConfig, logger *logging.Logger) (*Executor, error) {
 	var executor Executor
 	executor.ClientName = cfg.Sections["sensu"].Options["client_name"].GetString()
 	executor.TmpBaseDir = cfg.Sections["sensu"].Options["tmp_base_dir"].GetString()
@@ -58,18 +47,19 @@ func NewExecutor(cfg *config.Config, logger *logging.Logger) (*Executor, error) 
 	return &executor, nil
 }
 
-func (self *Executor) Execute(request CheckRequest) (Result, error) {
+//Execute prepares script for single check based on given the request and then executes it
+func (self *Executor) Execute(request connector.CheckRequest) (connector.CheckResult, error) {
 	// It is not possible to reasonably exec something like "cmd1 && cmd2 || exit 2".
 	// This is usual in Sensu framework so we need to make temporary script for each command.
 	// To avoid high IO the script files are cached
 	if _, ok := self.scriptCache[request.Command]; !ok {
 		scriptFile, err := ioutil.TempFile(self.TmpBaseDir, "check-")
 		if err != nil {
-			return Result{}, fmt.Errorf("Failed to create temporary file for script: %s", err)
+			return connector.CheckResult{}, fmt.Errorf("Failed to create temporary file for script: %s", err)
 		}
 		_, err = scriptFile.Write([]byte(fmt.Sprintf("#!/usr/bin/env sh\n%s\n", request.Command)))
 		if err != nil {
-			return Result{}, fmt.Errorf("Failed to write script content to temporary file: %s", err)
+			return connector.CheckResult{}, fmt.Errorf("Failed to write script content to temporary file: %s", err)
 		}
 		self.scriptCache[request.Command] = scriptFile.Name()
 		scriptFile.Close()
@@ -77,14 +67,6 @@ func (self *Executor) Execute(request CheckRequest) (Result, error) {
 		self.log.Debug("Created check script.")
 	}
 
-	//cmdParts := strings.Split(request.Command, " ")
-	//command := cmdParts[0]
-	//args := []string{}
-	//for _, part := range cmdParts[1:] {
-	//	if part != "" {
-	//		args = append(args, part)
-	//	}
-	//}
 	cmd := exec.Command(self.ShellPath, self.scriptCache[request.Command])
 	start := time.Now()
 	output, err := cmd.CombinedOutput()
@@ -103,9 +85,9 @@ func (self *Executor) Execute(request CheckRequest) (Result, error) {
 	}
 
 	outStr := string(output)
-	result := Result{
+	result := connector.CheckResult{
 		Client: self.ClientName,
-		Check: CheckResult{
+		Result: connector.Result{
 			Command:  request.Command,
 			Name:     request.Name,
 			Issued:   request.Issued,
