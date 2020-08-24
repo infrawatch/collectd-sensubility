@@ -196,18 +196,13 @@ func main() {
 	// spawn entities
 	metadata := GetAgentConfigMetadata()
 	cfg := config.NewINIConfig(metadata, log)
-	if err != nil {
-		log.Metadata(map[string]interface{}{"error": err})
-		log.Error("Failed to parse config file.")
-		os.Exit(2)
-	}
 	confPath := os.Getenv("COLLECTD_SENSUBILITY_CONFIG")
 	if confPath == "" {
 		confPath = DefaultConfigPath
 	}
 	err = cfg.Parse(confPath)
 	if err != nil {
-		fmt.Printf("Failed to parse log file: %s\n", err.Error())
+		fmt.Printf("Failed to parse config file: %s\n", err.Error())
 		os.Exit(2)
 	}
 
