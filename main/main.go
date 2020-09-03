@@ -218,7 +218,7 @@ func main() {
 	if sect, ok := cfg.Sections["sensu"]; ok {
 		if opt, ok := sect.Options["connection"]; ok {
 			if len(opt.GetString()) > 0 {
-				sensuConnector, err = connector.NewSensuConnector(cfg, log)
+				sensuConnector, err = connector.ConnectSensu(cfg, log)
 				if err != nil {
 					log.Metadata(map[string]interface{}{"error": err, "connection": opt.GetString()})
 					log.Error("Failed to spawn RabbitMQ connector.")
@@ -237,16 +237,10 @@ func main() {
 	if sect, ok := cfg.Sections["amqp1"]; ok {
 		if opt, ok := sect.Options["connection"]; ok {
 			if len(opt.GetString()) > 0 {
-				amqpConnector, err = connector.NewAMQP10Connector(cfg, log)
+				amqpConnector, err = connector.ConnectAMQP10(cfg, log)
 				if err != nil {
 					log.Metadata(map[string]interface{}{"error": err, "connection": opt.GetString()})
 					log.Error("Failed to spawn AMQP1.0 connector.")
-					os.Exit(2)
-				}
-				err = amqpConnector.Connect()
-				if err != nil {
-					log.Metadata(map[string]interface{}{"error": err, "connection": opt.GetString()})
-					log.Error("Failed to connect to AMQP1.0 message bus.")
 					os.Exit(2)
 				}
 				defer amqpConnector.Disconnect()
