@@ -1,18 +1,31 @@
 package formats
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"os/exec"
+	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/infrawatch/apputils/connector"
 	"github.com/infrawatch/collectd-sensubility/sensu"
 )
 
+func sysUUID() string {
+	var out bytes.Buffer
+	cmd := exec.Command("uuidgen")
+	cmd.Stdout = &out
+	err := cmd.Run()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(out.String())
+}
+
 //global indentifiers
 var (
-	DefaultHostUUID = (uuid.New()).String()
+	DefaultHostUUID = sysUUID()
 )
 
 //SGResult is a format of event which Smart Gateway from STF understands.
