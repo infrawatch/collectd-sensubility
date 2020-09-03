@@ -11,7 +11,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:f31254b3098f0b51143b65f1219d75604586219d9237abf833dec069d5d0795b"
+  digest = "1:a3ab5b2afc1de660ae0bb69dece5ea870a7f1f70416dd5e3b3098146a570f92d"
   name = "github.com/infrawatch/apputils"
   packages = [
     "config",
@@ -19,7 +19,7 @@
     "logging",
   ]
   pruneopts = "UT"
-  revision = "9a73d95e9e8f087be01c28aec27ad188f5e0c580"
+  revision = "32be300e170ad2598ab995921050c13c9d0afc3d"
 
 [[projects]]
   digest = "1:5ca236e4ecfeb92a57b7a4c7f139023384e7f726640f61b17820473cc82dfb77"
