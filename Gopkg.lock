@@ -2,24 +2,16 @@
 
 
 [[projects]]
-  digest = "1:2a8ce9278a57dba0bca00383d26744e88324c2696ad8538b3f7a69067d02d78c"
+  digest = "1:83ecbe7e77605831ddd64f66d09465e28c33ea57d5a15e45e2ad88a030a40c12"
   name = "github.com/go-ini/ini"
   packages = ["."]
   pruneopts = "UT"
-  revision = "1fc6efb6f20ef065ae00baf7f4fa7722cad0ec34"
-  version = "v1.57.0"
-
-[[projects]]
-  digest = "1:582b704bebaa06b48c29b0cec224a6058a09c86883aaddabde889cd1a5f73e1b"
-  name = "github.com/google/uuid"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "0cd6bf5da1e1c83f8b45653022c74f71af0538a4"
-  version = "v1.1.1"
+  revision = "abeaefd44b914b59b7bf2d928bcf942701e028f0"
+  version = "v1.60.2"
 
 [[projects]]
   branch = "master"
-  digest = "1:01c7fb104935e3cf6e32637ba2b4a015ffb4cb36e08374a9c56d48e4f88b7bc1"
+  digest = "1:f31254b3098f0b51143b65f1219d75604586219d9237abf833dec069d5d0795b"
   name = "github.com/infrawatch/apputils"
   packages = [
     "config",
@@ -27,7 +19,7 @@
     "logging",
   ]
   pruneopts = "UT"
-  revision = "d8a8f9d69983c75dd3e4fb3eca17de3b5fed5592"
+  revision = "9a73d95e9e8f087be01c28aec27ad188f5e0c580"
 
 [[projects]]
   digest = "1:5ca236e4ecfeb92a57b7a4c7f139023384e7f726640f61b17820473cc82dfb77"
@@ -53,10 +45,11 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
-    "github.com/google/uuid",
     "github.com/infrawatch/apputils/config",
     "github.com/infrawatch/apputils/connector",
     "github.com/infrawatch/apputils/logging",
+    "qpid.apache.org/amqp",
+    "qpid.apache.org/electron",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1
