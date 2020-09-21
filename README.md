@@ -13,9 +13,6 @@ The agent behaves exactly the same as Ruby-based sensu-client does, eg. it conne
 for check execution requests from Sensu server. Sensubility then executes the requested command and reports the result back
 to proper channel in RabbitMQ message bus.
 
-## Features left to implement
-  - implement AMQP-1.0 connection to be able to report results to STF server side
-
 ## Installation
 
 ### From source
