@@ -5,16 +5,16 @@ set -ex
 # enable required repo(s)
 yum install -y epel-release
 
+# Locale setting in CentOS8 is broken without this package
+yum install -y glibc-langpack-en
+
 # install Go
 yum install -y golang
-export GOPATH=/root/go
 export GOBIN=$GOPATH/bin
 export PATH=$PATH:$GOBIN
 
-# install dep and sensubility dependencies
-yum install -y qpid-proton-c-devel
-go get -u github.com/golang/dep/...
-dep ensure -v
+# install sensubility dependencies
+yum install -y qpid-proton-c-devel git
 
 # install collectd-sensubility
 go build -o $GOBIN/collectd-sensubility main/main.go
@@ -22,7 +22,8 @@ go build -o $GOBIN/collectd-sensubility main/main.go
 # install Python part of CI
 export LC_ALL=en_US.UTF-8
 export LANG=en_US.UTF-8
-yum install -y Cython python3 python3-pip python36-Cython python3-qpid-proton
+yum install -y python3 python3-pip python3-qpid-proton
+pip3 install Cython
 pip3 install -r ci/mocks/sensu/requirements.txt
 pip3 install -r ci/mocks/amqp1/requirements.txt
 
