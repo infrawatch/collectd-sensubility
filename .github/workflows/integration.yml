@@ -1,0 +1,31 @@
+name: Integration testing
+env:
+  RABBITMQ_VERSION: 3.7.24
+  QDROUTERD_VERSION: 1.12.0
+  COVERALLS_TOKEN: ${{ secrets.COVERALLS_TOKEN }}
+on: push
+
+jobs:
+  test-framework:
+    name: Integration testing
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Start RabbitMQ message bus
+        run: |
+          docker run --name=rabbitmq -p 5672:5672 -p 4369:4369 -d rabbitmq:$RABBITMQ_VERSION
+      - name: Start qdrouterd message bus
+        run: |
+          docker run --name=qdr --volume=$PWD/ci/qdrouterd.conf:/etc/qpid-dispatch/qdrouterd.conf:ro -p 5666:5666 -d quay.io/interconnectedcloud/qdrouterd:$QDROUTERD_VERSION
+      - name: Configure RabbitMQ message bus
+        run: |
+          docker exec rabbitmq rabbitmqctl start_app
+          sleep 5
+          docker exec rabbitmq rabbitmqctl add_vhost /sensu
+          docker exec rabbitmq rabbitmqctl set_permissions -p "/sensu" guest ".*" ".*" ".*"
+      - name: Run integration tests
+        run: |
+          export PROJECT_ROOT=/root/go/src/github.com/infrawatch/collectd-sensubility
+          docker run -uroot --network host --volume $PWD:$PROJECT_ROOT:z --workdir $PROJECT_ROOT centos:8 bash ci/run_ci.sh
