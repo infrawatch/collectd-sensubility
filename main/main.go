@@ -50,7 +50,7 @@ func GetAgentConfigMetadata() map[string][]config.Parameter {
 			config.Parameter{
 				Name:       "log_file",
 				Tag:        "",
-				Default:    "/var/log/collectd-sensubility.log",
+				Default:    "/var/log/collectd/sensubility.log",
 				Validators: []config.Validator{},
 			},
 			config.Parameter{
@@ -191,7 +191,6 @@ func main() {
 		fmt.Printf("Failed to open log file %s.\n", *logpath)
 		os.Exit(2)
 	}
-	defer log.Destroy()
 
 	// spawn entities
 	metadata := GetAgentConfigMetadata()
@@ -202,8 +201,33 @@ func main() {
 	}
 	err = cfg.Parse(confPath)
 	if err != nil {
+		log.Destroy()
 		fmt.Printf("Failed to parse config file: %s\n", err.Error())
 		os.Exit(2)
+	}
+
+	// recreate logger according to values in config file
+	logFile, err := cfg.GetOption("default/log_file")
+	if err == nil && len(logFile.GetString()) > 0 {
+		log, err = logging.NewLogger(level, logFile)
+		if err != nil {
+			fmt.Printf("Failed to open log file %s.\n", logFile)
+			os.Exit(2)
+		}
+		defer log.Destroy()
+	}
+	logLevel, err := cfg.GetOption("default/log_level")
+	if err == nil && len(logLevel.GetString()) > 0 {
+		switch logLevel.GetString() {
+		case "DEBUG":
+			log.SetLogLevel(logging.DEBUG)
+		case "INFO":
+			log.SetLogLevel(logging.INFO)
+		case "WARNING":
+			log.SetLogLevel(logging.WARN)
+		case "ERROR":
+			log.SetLogLevel(logging.ERROR)
+		}
 	}
 
 	requests := make(chan interface{})
