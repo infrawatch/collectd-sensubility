@@ -6,7 +6,7 @@ require (
 	github.com/apache/qpid-proton v0.0.0-20210222174104-6353ad99c23d
 	github.com/creack/pty v1.1.11 // indirect
 	github.com/go-ini/ini v1.62.0
-	github.com/infrawatch/apputils v0.0.0-20210223194306-28412c8e501c
+	github.com/infrawatch/apputils v0.0.0-20210809211320-3573b2937d14 // indirect
 	github.com/kr/pty v1.1.8 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/streadway/amqp v1.0.0

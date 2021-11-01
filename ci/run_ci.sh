@@ -33,7 +33,7 @@ sleep 5
 
 export COLLECTD_SENSUBILITY_CONFIG=$PWD/ci/mocks/sensu/collectd-sensubility.conf
 touch sensubility-ci.log
-collectd-sensubility --debug --log sensubility-ci.log &
+collectd-sensubility --debug --log=sensubility-ci.log &
 
 python3 ci/mocks/sensu/sensu_verify.py --timeout 120
 EXIT_CODE=$?
