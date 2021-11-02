@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/infrawatch/apputils/connector"
+	connector "github.com/infrawatch/apputils/connector/sensu"
 	"github.com/infrawatch/collectd-sensubility/sensu"
 )
 

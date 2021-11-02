@@ -8,7 +8,8 @@ import (
 	"os"
 
 	"github.com/infrawatch/apputils/config"
-	"github.com/infrawatch/apputils/connector"
+	"github.com/infrawatch/apputils/connector/amqp10"
+	connector "github.com/infrawatch/apputils/connector/sensu"
 	"github.com/infrawatch/apputils/logging"
 	"github.com/infrawatch/collectd-sensubility/formats"
 	"github.com/infrawatch/collectd-sensubility/sensu"
@@ -16,6 +17,7 @@ import (
 
 //Default values for various functions
 const (
+	DefaultLogPath    = "/var/log/collectd/sensubility.log"
 	DefaultConfigPath = "/etc/collectd-sensubility.conf"
 	DefaultHostname   = "localhost.localdomain"
 	DefaultIP         = "127.0.0.1"
@@ -50,7 +52,7 @@ func GetAgentConfigMetadata() map[string][]config.Parameter {
 			config.Parameter{
 				Name:       "log_file",
 				Tag:        "",
-				Default:    "/var/log/collectd/sensubility.log",
+				Default:    "",
 				Validators: []config.Validator{},
 			},
 			config.Parameter{
@@ -174,7 +176,7 @@ func main() {
 	debug := flag.Bool("debug", false, "enables debugging logs")
 	verbose := flag.Bool("verbose", false, "enables informational logs")
 	silent := flag.Bool("silent", false, "disables all logs except fatal errors")
-	logpath := flag.String("log", "/var/log/collectd/sensubility.log", "path to log file")
+	logpath := flag.String("log", DefaultLogPath, "path to log file")
 	flag.Parse()
 
 	// set logging
@@ -208,8 +210,8 @@ func main() {
 
 	// recreate logger according to values in config file
 	logFile, err := cfg.GetOption("default/log_file")
-	if err == nil && len(logFile.GetString()) > 0 {
-		log, err = logging.NewLogger(level, logFile)
+	if err == nil && logFile.GetString() != "" {
+		log, err = logging.NewLogger(level, logFile.GetString())
 		if err != nil {
 			fmt.Printf("Failed to open log file %s.\n", logFile)
 			os.Exit(2)
@@ -257,11 +259,11 @@ func main() {
 
 	reportAmqp := false
 	amqpAddr := "collectd/events"
-	amqpConnector := &connector.AMQP10Connector{}
+	amqpConnector := &amqp10.AMQP10Connector{}
 	if sect, ok := cfg.Sections["amqp1"]; ok {
 		if opt, ok := sect.Options["connection"]; ok {
 			if len(opt.GetString()) > 0 {
-				amqpConnector, err = connector.ConnectAMQP10(cfg, log)
+				amqpConnector, err = amqp10.ConnectAMQP10(cfg, log)
 				if err != nil {
 					log.Metadata(map[string]interface{}{"error": err, "connection": opt.GetString()})
 					log.Error("Failed to spawn AMQP1.0 connector.")
@@ -343,7 +345,7 @@ func main() {
 							log.Error("Failed to marshal check result.")
 							continue
 						}
-						msg := connector.AMQP10Message{
+						msg := amqp10.AMQP10Message{
 							Address: *amqpAddr,
 							Body:    string(body),
 						}

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/infrawatch/apputils/config"
-	"github.com/infrawatch/apputils/connector"
+	connector "github.com/infrawatch/apputils/connector/sensu"
 	"github.com/infrawatch/apputils/logging"
 )
 
