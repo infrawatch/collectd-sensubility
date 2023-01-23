@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"syscall"
 
 	"github.com/infrawatch/apputils/config"
 	"github.com/infrawatch/apputils/connector/amqp10"
 	connector "github.com/infrawatch/apputils/connector/sensu"
 	"github.com/infrawatch/apputils/logging"
+	"github.com/infrawatch/apputils/system"
 	"github.com/infrawatch/collectd-sensubility/formats"
 	"github.com/infrawatch/collectd-sensubility/sensu"
 )
@@ -58,7 +60,7 @@ func GetAgentConfigMetadata() map[string][]config.Parameter {
 			config.Parameter{
 				Name:       "log_level",
 				Tag:        "",
-				Default:    "INFO",
+				Default:    "WARNING",
 				Validators: []config.Validator{config.StringOptionsValidatorFactory([]string{"DEBUG", "INFO", "WARNING", "ERROR"})},
 			},
 			config.Parameter{
@@ -219,17 +221,26 @@ func main() {
 		defer log.Destroy()
 	}
 	logLevel, err := cfg.GetOption("default/log_level")
+	confLevel := logging.WARN
 	if err == nil && len(logLevel.GetString()) > 0 {
 		switch logLevel.GetString() {
 		case "DEBUG":
-			log.SetLogLevel(logging.DEBUG)
+			confLevel = logging.DEBUG
 		case "INFO":
-			log.SetLogLevel(logging.INFO)
+			confLevel = logging.INFO
 		case "WARNING":
-			log.SetLogLevel(logging.WARN)
+			confLevel = logging.WARN
 		case "ERROR":
-			log.SetLogLevel(logging.ERROR)
+			confLevel = logging.ERROR
 		}
+	}
+	// update log level only if it was not overriden from cmdline
+	if level != confLevel && level != logging.WARN {
+		log.SetLogLevel(level)
+		log.Metadata(logging.Metadata{"config-log-level": confLevel, "cmd-log-level": level})
+		log.Info("Logging level overriden from command line.")
+	} else {
+		log.SetLogLevel(confLevel)
 	}
 
 	requests := make(chan interface{})
@@ -263,7 +274,7 @@ func main() {
 	if sect, ok := cfg.Sections["amqp1"]; ok {
 		if opt, ok := sect.Options["connection"]; ok {
 			if len(opt.GetString()) > 0 {
-				amqpConnector, err = amqp10.ConnectAMQP10(cfg, log)
+				amqpConnector, err = amqp10.ConnectAMQP10("sensubility", cfg, log)
 				if err != nil {
 					log.Metadata(map[string]interface{}{"error": err, "connection": opt.GetString()})
 					log.Error("Failed to spawn AMQP1.0 connector.")
@@ -304,62 +315,68 @@ func main() {
 	sensuScheduler.Start(requests)
 
 	// spawn worker goroutines
-
 	workers := cfg.Sections["sensu"].Options["worker_count"].GetInt()
 	for i := int64(0); i < workers; i++ {
 		go func(amqpAddr *string, amqpResults chan interface{}) {
 			for {
-				req := <-requests
-				switch req := req.(type) {
-				case connector.CheckRequest:
-					res, err := sensuExecutor.Execute(req)
-					if err != nil {
-						reqstr := fmt.Sprintf("Request{name=%s, command=%s, issued=%d}", req.Name, req.Command, req.Issued)
-						log.Metadata(map[string]interface{}{
-							"error":   err,
-							"request": reqstr,
-						})
-						log.Error("Failed to execute requested command.")
-						continue
-					}
-					if reportSensu {
-						sensuResults <- res
-					}
-					if reportAmqp {
-						var body []byte
-						if cfg.Sections["amqp1"].Options["results_format"].GetString() == "sensu" {
-							body, err = json.Marshal(res)
-						} else {
-							sgres, errr := formats.CreateSGResult(res)
-							if errr == nil {
-								body, err = json.Marshal(sgres)
-							} else {
-								err = errr
-							}
-						}
+				select {
+				case req := <-requests:
+					switch req := req.(type) {
+					case connector.CheckRequest:
+						res, err := sensuExecutor.Execute(req)
 						if err != nil {
+							reqstr := fmt.Sprintf("Request{name=%s, command=%s, issued=%d}", req.Name, req.Command, req.Issued)
 							log.Metadata(map[string]interface{}{
-								"error":  err,
-								"result": res,
+								"error":   err,
+								"request": reqstr,
 							})
-							log.Error("Failed to marshal check result.")
+							log.Error("Failed to execute requested command.")
 							continue
 						}
-						msg := amqp10.AMQP10Message{
-							Address: *amqpAddr,
-							Body:    string(body),
+						if reportSensu {
+							sensuResults <- res
 						}
-						amqpResults <- msg
+						if reportAmqp {
+							var body []byte
+							if cfg.Sections["amqp1"].Options["results_format"].GetString() == "sensu" {
+								body, err = json.Marshal(res)
+							} else {
+								sgres, errr := formats.CreateSGResult(res)
+								if errr == nil {
+									body, err = json.Marshal(sgres)
+								} else {
+									err = errr
+								}
+							}
+							if err != nil {
+								log.Metadata(map[string]interface{}{
+									"error":  err,
+									"result": res,
+								})
+								log.Error("Failed to marshal check result.")
+								continue
+							}
+							msg := amqp10.AMQP10Message{
+								Address: *amqpAddr,
+								Body:    string(body),
+							}
+							amqpResults <- msg
+						}
+					default:
+						log.Metadata(map[string]interface{}{
+							"type":    fmt.Sprintf("%T", req),
+							"request": req,
+						})
+						log.Error("Invalid type of execution request.")
 					}
-				default:
-					log.Metadata(map[string]interface{}{
-						"error":   err,
-						"request": req,
-					})
-					log.Error("Failed to execute requested command.")
+				case <-wait:
+					log.Metadata(logging.Metadata{"id": i})
+					log.Info("Shutting down worker.")
 				}
 			}
 		}(&amqpAddr, amqpResults)
 	}
+
+	system.SpawnSignalHandler(wait, log, syscall.SIGINT, syscall.SIGKILL)
 	<-wait
 }
