@@ -28,4 +28,4 @@ jobs:
       - name: Run integration tests
         run: |
           export PROJECT_ROOT=/root/go/src/github.com/infrawatch/collectd-sensubility
-          docker run -uroot --network host --volume $PWD:$PROJECT_ROOT:z --workdir $PROJECT_ROOT centos:8 bash ci/run_ci.sh
+          docker run -uroot --network host --volume $PWD:$PROJECT_ROOT:z --workdir $PROJECT_ROOT -e GITHUB_HEAD_REF quay.io/centos/centos:stream8 bash ci/run_ci.sh

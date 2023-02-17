@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sync"
+	"syscall"
 
 	"github.com/infrawatch/apputils/config"
 	"github.com/infrawatch/apputils/connector/amqp10"
 	connector "github.com/infrawatch/apputils/connector/sensu"
 	"github.com/infrawatch/apputils/logging"
+	"github.com/infrawatch/apputils/system"
 	"github.com/infrawatch/collectd-sensubility/formats"
 	"github.com/infrawatch/collectd-sensubility/sensu"
 )
@@ -21,11 +24,13 @@ const (
 	DefaultConfigPath = "/etc/collectd-sensubility.conf"
 	DefaultHostname   = "localhost.localdomain"
 	DefaultIP         = "127.0.0.1"
+	EnvVarHostname    = "COLLECTD_HOSTNAME"
+	EnvVarConfig      = "COLLECTD_SENSUBILITY_CONFIG"
 )
 
 //GetHostname returns value of COLLECTD_HOSTNAME env or if not set FQDN of the host
 func GetHostname() string {
-	if host := os.Getenv("COLLECTD_HOSTNAME"); host != "" {
+	if host := os.Getenv(EnvVarHostname); host != "" {
 		return host
 	}
 	if host, err := os.Hostname(); err == nil {
@@ -48,120 +53,120 @@ func GetOutboundIP() string {
 //GetAgentConfigMetadata returns config metadata sctructure for apputils.config usage
 func GetAgentConfigMetadata() map[string][]config.Parameter {
 	elements := map[string][]config.Parameter{
-		"default": []config.Parameter{
-			config.Parameter{
+		"default": {
+			{
 				Name:       "log_file",
 				Tag:        "",
 				Default:    "",
 				Validators: []config.Validator{},
 			},
-			config.Parameter{
+			{
 				Name:       "log_level",
 				Tag:        "",
-				Default:    "INFO",
+				Default:    "WARNING",
 				Validators: []config.Validator{config.StringOptionsValidatorFactory([]string{"DEBUG", "INFO", "WARNING", "ERROR"})},
 			},
-			config.Parameter{
+			{
 				Name:       "allow_exec",
 				Tag:        "",
 				Default:    "true",
 				Validators: []config.Validator{config.BoolValidatorFactory()},
 			},
 		},
-		"sensu": []config.Parameter{
-			config.Parameter{
+		"sensu": {
+			{
 				Name:       "connection",
 				Tag:        "",
 				Default:    "",
 				Validators: []config.Validator{},
 			},
-			config.Parameter{
+			{
 				Name:       "subscriptions",
 				Tag:        "",
 				Default:    "all,default",
 				Validators: []config.Validator{},
 			},
-			config.Parameter{
+			{
 				Name:       "client_name",
 				Tag:        "",
 				Default:    GetHostname(),
 				Validators: []config.Validator{},
 			},
-			config.Parameter{
+			{
 				Name:       "client_address",
 				Tag:        "",
 				Default:    GetOutboundIP(),
 				Validators: []config.Validator{},
 			},
-			config.Parameter{
+			{
 				Name:       "keepalive_interval",
 				Tag:        "",
 				Default:    20,
 				Validators: []config.Validator{config.IntValidatorFactory()},
 			},
-			config.Parameter{
+			{
 				Name:       "tmp_base_dir",
 				Tag:        "",
 				Default:    "/var/tmp/collectd-sensubility-checks",
 				Validators: []config.Validator{},
 			},
-			config.Parameter{
+			{
 				Name:       "shell_path",
 				Tag:        "",
 				Default:    "/usr/bin/sh",
 				Validators: []config.Validator{},
 			},
-			config.Parameter{
+			{
 				Name:       "worker_count",
 				Tag:        "",
 				Default:    2,
 				Validators: []config.Validator{config.IntValidatorFactory()},
 			},
-			config.Parameter{
+			{
 				Name:       "checks",
 				Tag:        "",
 				Default:    "{}",
 				Validators: []config.Validator{},
 			},
 		},
-		"amqp1": []config.Parameter{
-			config.Parameter{
+		"amqp1": {
+			{
 				Name:       "connection",
 				Tag:        "",
 				Default:    "",
 				Validators: []config.Validator{},
 			},
-			config.Parameter{
+			{
 				Name:       "client_name",
 				Tag:        "",
 				Default:    GetHostname(),
 				Validators: []config.Validator{},
 			},
-			config.Parameter{
+			{
 				Name:       "send_timeout",
 				Tag:        "",
 				Default:    2,
 				Validators: []config.Validator{config.IntValidatorFactory()},
 			},
-			config.Parameter{
+			{
 				Name:       "results_channel",
 				Tag:        "",
 				Default:    "collectd/events",
 				Validators: []config.Validator{},
 			},
-			config.Parameter{
+			{
 				Name:       "results_format",
 				Tag:        "",
 				Default:    "smartgateway",
 				Validators: []config.Validator{config.StringOptionsValidatorFactory([]string{"smartgateway", "sensu"})},
 			},
-			config.Parameter{
+			{
 				Name:       "listen_channels",
 				Tag:        "",
 				Default:    "",
 				Validators: []config.Validator{},
 			},
-			config.Parameter{
+			{
 				Name:       "listen_prefetch",
 				Tag:        "",
 				Default:    -1,
@@ -197,7 +202,7 @@ func main() {
 	// spawn entities
 	metadata := GetAgentConfigMetadata()
 	cfg := config.NewINIConfig(metadata, log)
-	confPath := os.Getenv("COLLECTD_SENSUBILITY_CONFIG")
+	confPath := os.Getenv(EnvVarConfig)
 	if confPath == "" {
 		confPath = DefaultConfigPath
 	}
@@ -219,17 +224,26 @@ func main() {
 		defer log.Destroy()
 	}
 	logLevel, err := cfg.GetOption("default/log_level")
+	confLevel := logging.WARN
 	if err == nil && len(logLevel.GetString()) > 0 {
 		switch logLevel.GetString() {
 		case "DEBUG":
-			log.SetLogLevel(logging.DEBUG)
+			confLevel = logging.DEBUG
 		case "INFO":
-			log.SetLogLevel(logging.INFO)
+			confLevel = logging.INFO
 		case "WARNING":
-			log.SetLogLevel(logging.WARN)
+			confLevel = logging.WARN
 		case "ERROR":
-			log.SetLogLevel(logging.ERROR)
+			confLevel = logging.ERROR
 		}
+	}
+	// update log level only if it was not overriden from cmdline
+	if level != confLevel && level != logging.WARN {
+		log.SetLogLevel(level)
+		log.Metadata(logging.Metadata{"config-log-level": confLevel, "cmd-log-level": level})
+		log.Info("Logging level overriden from command line.")
+	} else {
+		log.SetLogLevel(confLevel)
 	}
 
 	requests := make(chan interface{})
@@ -260,17 +274,17 @@ func main() {
 	reportAmqp := false
 	amqpAddr := "collectd/events"
 	amqpConnector := &amqp10.AMQP10Connector{}
+	var amqpWg *sync.WaitGroup
 	if sect, ok := cfg.Sections["amqp1"]; ok {
 		if opt, ok := sect.Options["connection"]; ok {
 			if len(opt.GetString()) > 0 {
-				amqpConnector, err = amqp10.ConnectAMQP10(cfg, log)
+				amqpConnector, err = amqp10.ConnectAMQP10("sensubility", cfg, log)
 				if err != nil {
 					log.Metadata(map[string]interface{}{"error": err, "connection": opt.GetString()})
 					log.Error("Failed to spawn AMQP1.0 connector.")
 					os.Exit(2)
 				}
-				defer amqpConnector.Disconnect()
-				amqpConnector.Start(requests, amqpResults)
+				amqpWg = amqpConnector.Start(requests, amqpResults)
 				reportAmqp = true
 
 				addrOpt, err := cfg.GetOption("amqp1/results_channel")
@@ -304,62 +318,80 @@ func main() {
 	sensuScheduler.Start(requests)
 
 	// spawn worker goroutines
-
 	workers := cfg.Sections["sensu"].Options["worker_count"].GetInt()
 	for i := int64(0); i < workers; i++ {
-		go func(amqpAddr *string, amqpResults chan interface{}) {
+		go func(wid int64, amqpAddr *string, amqpResults chan interface{}) {
+		workerLoop:
 			for {
-				req := <-requests
-				switch req := req.(type) {
-				case connector.CheckRequest:
-					res, err := sensuExecutor.Execute(req)
-					if err != nil {
-						reqstr := fmt.Sprintf("Request{name=%s, command=%s, issued=%d}", req.Name, req.Command, req.Issued)
-						log.Metadata(map[string]interface{}{
-							"error":   err,
-							"request": reqstr,
-						})
-						log.Error("Failed to execute requested command.")
-						continue
-					}
-					if reportSensu {
-						sensuResults <- res
-					}
-					if reportAmqp {
-						var body []byte
-						if cfg.Sections["amqp1"].Options["results_format"].GetString() == "sensu" {
-							body, err = json.Marshal(res)
-						} else {
-							sgres, errr := formats.CreateSGResult(res)
-							if errr == nil {
-								body, err = json.Marshal(sgres)
-							} else {
-								err = errr
-							}
-						}
+				select {
+				case req := <-requests:
+					switch req := req.(type) {
+					case connector.CheckRequest:
+						res, err := sensuExecutor.Execute(req)
 						if err != nil {
+							reqstr := fmt.Sprintf("Request{name=%s, command=%s, issued=%d}", req.Name, req.Command, req.Issued)
 							log.Metadata(map[string]interface{}{
-								"error":  err,
-								"result": res,
+								"error":   err,
+								"request": reqstr,
 							})
-							log.Error("Failed to marshal check result.")
+							log.Error("Failed to execute requested command.")
 							continue
 						}
-						msg := amqp10.AMQP10Message{
-							Address: *amqpAddr,
-							Body:    string(body),
+						if reportSensu {
+							sensuResults <- res
 						}
-						amqpResults <- msg
+						if reportAmqp {
+							var body []byte
+							if cfg.Sections["amqp1"].Options["results_format"].GetString() == "sensu" {
+								body, err = json.Marshal(res)
+							} else {
+								sgres, errr := formats.CreateSGResult(res)
+								if errr == nil {
+									body, err = json.Marshal(sgres)
+								} else {
+									err = errr
+								}
+							}
+							if err != nil {
+								log.Metadata(map[string]interface{}{
+									"error":  err,
+									"result": res,
+								})
+								log.Error("Failed to marshal check result.")
+								continue
+							}
+							msg := amqp10.AMQP10Message{
+								Address: *amqpAddr,
+								Body:    string(body),
+							}
+							amqpResults <- msg
+						}
+					default:
+						log.Metadata(map[string]interface{}{
+							"type":    fmt.Sprintf("%T", req),
+							"request": req,
+						})
+						log.Error("Invalid type of execution request.")
 					}
-				default:
-					log.Metadata(map[string]interface{}{
-						"error":   err,
-						"request": req,
-					})
-					log.Error("Failed to execute requested command.")
+				case <-wait:
+					log.Metadata(logging.Metadata{"id": wid})
+					log.Info("Shutting down worker.")
+					break workerLoop
 				}
 			}
-		}(&amqpAddr, amqpResults)
+		}(i, &amqpAddr, amqpResults)
 	}
+
+	system.SpawnSignalHandler(wait, log, syscall.SIGINT, syscall.SIGKILL)
 	<-wait
+
+	if reportAmqp {
+		amqpConnector.Disconnect()
+		log.Debug("Disconnecting AMQP-1.0 connector.")
+		amqpWg.Wait()
+	}
+	if reportSensu {
+		sensuConnector.Disconnect()
+		log.Debug("Disconnecting Sensu (RabbitMQ) connector.")
+	}
 }
