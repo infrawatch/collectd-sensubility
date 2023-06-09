@@ -24,7 +24,7 @@ dnf downgrade -y https://cbs.centos.org/kojifiles/packages/qpid-proton/0.35.0/3.
 go mod tidy
 
 # check if apputils repository has same topic branch
-BRANCH="$(echo ${GITHUB_HEAD_REF#refs/heads/})"
+BRANCH="$(echo ${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}})"
 if git ls-remote --exit-code --heads https://github.com/infrawatch/apputils.git $BRANCH; then
     pushd ..
     git clone -b $BRANCH https://github.com/infrawatch/apputils.git
