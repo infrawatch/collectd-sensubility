@@ -289,7 +289,7 @@ func main() {
 	sensuConnector := &connector.SensuConnector{}
 	if sect, ok := cfg.Sections["sensu"]; ok {
 		if opt, ok := sect.Options["connection"]; ok {
-			if len(opt.GetString()) > 0 {i
+			if len(opt.GetString()) > 0 {
 				connection := opt.GetString()
 				connection = processConnectionString(connection)
 				sect.Options["connection"] = config.NewConfigOption(connection
