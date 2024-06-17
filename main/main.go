@@ -177,6 +177,38 @@ func GetAgentConfigMetadata() map[string][]config.Parameter {
 	return elements
 }
 
+func processConnectionString(connection string) string {
+    // Check if the connection string contains an "@" character, indicating credentials
+    if strings.Contains(connection, "@") {
+        // Split the connection string into protocol part and host:port part
+        parts := strings.SplitN(connection, "@", 2)
+        if len(parts) == 2 {
+            protocol := parts[0] + "@"
+            hostPort := parts[1]
+            
+            // Split the host:port into host and port
+            hostPortParts := strings.SplitN(hostPort, ":", 2)
+            if len(hostPortParts) == 2 {
+                host := hostPortParts[0]
+                port := hostPortParts[1]
+                
+                // Further processing of host and port, including handling IPv6 brackets if necessary
+                if strings.Contains(host, ":") {
+                    if !strings.HasPrefix(host, "[") && !strings.HasSuffix(host, "]") {
+                        host = "[" + host + "]"
+                    }
+                }
+                
+                // Reconstruct the connection string with corrected formatting
+                return protocol + host + ":" + port
+            }
+        }
+    }
+    
+    // Return the original connection string if no modifications were made
+    return connection
+}
+
 func main() {
 	debug := flag.Bool("debug", false, "enables debugging logs")
 	verbose := flag.Bool("verbose", false, "enables informational logs")
@@ -257,7 +289,10 @@ func main() {
 	sensuConnector := &connector.SensuConnector{}
 	if sect, ok := cfg.Sections["sensu"]; ok {
 		if opt, ok := sect.Options["connection"]; ok {
-			if len(opt.GetString()) > 0 {
+			if len(opt.GetString()) > 0 {i
+				connection := opt.GetString()
+				connection = processConnectionString(connection)
+				sect.Options["connection"] = config.NewConfigOption(connection
 				sensuConnector, err = connector.ConnectSensu(cfg, log)
 				if err != nil {
 					log.Metadata(map[string]interface{}{"error": err, "connection": opt.GetString()})
@@ -278,6 +313,9 @@ func main() {
 	if sect, ok := cfg.Sections["amqp1"]; ok {
 		if opt, ok := sect.Options["connection"]; ok {
 			if len(opt.GetString()) > 0 {
+				connection := opt.GetString()
+				connection = processConnectionString(connection)
+				sect.Options["connection"] = config.NewConfigOption(connection)
 				amqpConnector, err = amqp10.ConnectAMQP10("sensubility", cfg, log)
 				if err != nil {
 					log.Metadata(map[string]interface{}{"error": err, "connection": opt.GetString()})
